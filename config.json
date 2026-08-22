@@ -1,5 +1,5 @@
 {
-  "GAS_ENDPOINT": "https://script.google.com/macros/s/YOUR_EXEC_ID_HERE/exec",
+  "GAS_ENDPOINT": "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec",
   "DB_NAME": "ArchitecturalAgendaDB",
   "DB_VERSION": 1,
   "STROKE_COLORS": {
