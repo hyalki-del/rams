@@ -1,0 +1,9 @@
+{
+  "GAS_ENDPOINT": "https://script.google.com/macros/s/YOUR_EXEC_ID_HERE/exec",
+  "DB_NAME": "ArchitecturalAgendaDB",
+  "DB_VERSION": 1,
+  "STROKE_COLORS": {
+    "vector": "#1A1A1A",
+    "annotation": "#FF4800"
+  }
+}
