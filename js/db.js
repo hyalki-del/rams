@@ -1,11 +1,13 @@
 class LocalStorageEngine {
-    constructor() {
+    constructor(dbName = 'ArchitecturalAgendaDB', dbVersion = 1) {
+        this.dbName = dbName;
+        this.dbVersion = dbVersion;
         this.db = null;
     }
 
     async init() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
+            const request = indexedDB.open(this.dbName, this.dbVersion);
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
                 if (!db.objectStoreNames.contains('entries')) {
