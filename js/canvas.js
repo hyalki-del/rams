@@ -1,7 +1,8 @@
 class SpatialInkingEngine {
-    constructor(containerEl, onStrokeEnd) {
+    constructor(containerEl, onStrokeEnd, strokeColors = { vector: '#1A1A1A', annotation: '#FF4800' }) {
         this.container = containerEl;
         this.onStrokeEnd = onStrokeEnd;
+        this.strokeColors = strokeColors;
 
         this.cvsBg = document.getElementById('layer-bg');
         this.cvsVector = document.getElementById('layer-vector');
@@ -72,7 +73,7 @@ class SpatialInkingEngine {
         const pt = this.getPointerPoint(e);
         this.currentStroke = {
             layer: this.activeLayer,
-            color: CONFIG.STROKE_COLORS[this.activeLayer],
+            color: this.strokeColors[this.activeLayer] || '#1A1A1A',
             points: [pt]
         };
     }
@@ -110,9 +111,6 @@ class SpatialInkingEngine {
         if (this.onStrokeEnd) this.onStrokeEnd();
     }
 
-    /**
-     * Quadratic Curve Interpolation via Midpoints
-     */
     renderMidpointSegment(ctx, p1, p2, color, layer) {
         const midX = (p1.x + p2.x) / 2;
         const midY = (p1.y + p2.y) / 2;
