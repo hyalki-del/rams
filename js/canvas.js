@@ -1,184 +1,124 @@
-class SpatialInkingEngine {
-    constructor(containerEl, onStrokeEnd, strokeColors = { vector: '#1A1A1A', annotation: '#FF4800' }) {
-        this.container = containerEl;
+class NormalizedVectorEngine {
+    constructor(svgEl, onStrokeEnd) {
+        this.svg = svgEl;
         this.onStrokeEnd = onStrokeEnd;
-        this.strokeColors = strokeColors;
+        
+        this.layerSketch = document.getElementById('layer-sketch');
+        this.layerRedline = document.getElementById('layer-redline');
+        this.activePath = document.getElementById('active-path');
+        this.bgImage = document.getElementById('svg-bg-image');
 
-        this.cvsBg = document.getElementById('layer-bg');
-        this.cvsVector = document.getElementById('layer-vector');
-        this.cvsAnnotation = document.getElementById('layer-annotation');
-
-        this.ctxBg = this.cvsBg.getContext('2d');
-        this.ctxVector = this.cvsVector.getContext('2d');
-        this.ctxAnnotation = this.cvsAnnotation.getContext('2d');
-
-        this.activeLayer = 'vector';
+        this.activeLayerName = 'sketch';
         this.isDrawing = false;
-        this.currentStroke = null;
-
-        this.strokeData = {
-            vectorStrokes: [],
-            annotationStrokes: [],
+        this.currentPoints = [];
+        
+        this.vectorState = {
+            sketchStrokes: [],
+            redlineStrokes: [],
             bgImageData: null
         };
 
-        this.initViewport();
-        this.bindInputEvents();
-        window.addEventListener('resize', () => this.initViewport());
+        this.bindPointerEvents();
     }
 
-    initViewport() {
-        const rect = this.container.getBoundingClientRect();
-        this.dpr = window.devicePixelRatio || 1;
-        this.width = rect.width;
-        this.height = rect.height;
-
-        [this.cvsBg, this.cvsVector, this.cvsAnnotation].forEach(cvs => {
-            cvs.width = this.width * this.dpr;
-            cvs.height = this.height * this.dpr;
-            const ctx = cvs.getContext('2d');
-            ctx.scale(this.dpr, this.dpr);
-        });
-
-        this.renderGrid();
-        this.redrawAll();
+    bindPointerEvents() {
+        this.svg.addEventListener('pointerdown', e => this.onPointerDown(e));
+        this.svg.addEventListener('pointermove', e => this.onPointerMove(e));
+        this.svg.addEventListener('pointerup', e => this.onPointerUp(e));
+        this.svg.addEventListener('pointercancel', e => this.onPointerUp(e));
     }
 
-    setActiveLayer(layer) {
-        this.activeLayer = layer;
-    }
-
-    bindInputEvents() {
-        const target = this.cvsAnnotation;
-        target.addEventListener('pointerdown', e => this.onPointerDown(e));
-        target.addEventListener('pointermove', e => this.onPointerMove(e));
-        target.addEventListener('pointerup', e => this.onPointerUp(e));
-        target.addEventListener('pointercancel', e => this.onPointerUp(e));
-    }
-
-    getPointerPoint(e) {
-        const rect = this.cvsAnnotation.getBoundingClientRect();
+    getNormalizedPoint(e) {
+        const rect = this.svg.getBoundingClientRect();
         return {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-            p: e.pressure || 0.5
+            nx: (e.clientX - rect.left) / rect.width,
+            ny: (e.clientY - rect.top) / rect.height
         };
+    }
+
+    denormalizePath(points) {
+        const rect = this.svg.getBoundingClientRect();
+        if (!points || points.length === 0) return '';
+        
+        return points.reduce((acc, pt, i) => {
+            const x = pt.nx * rect.width;
+            const y = pt.ny * rect.height;
+            return i === 0 ? `M ${x.toFixed(1)} ${y.toFixed(1)}` : `${acc} L ${x.toFixed(1)} ${y.toFixed(1)}`;
+        }, '');
     }
 
     onPointerDown(e) {
         if (e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
         this.isDrawing = true;
-        this.cvsAnnotation.setPointerCapture(e.pointerId);
-
-        const pt = this.getPointerPoint(e);
-        this.currentStroke = {
-            layer: this.activeLayer,
-            color: this.strokeColors[this.activeLayer] || '#1A1A1A',
-            points: [pt]
-        };
+        this.svg.setPointerCapture(e.pointerId);
+        
+        const pt = this.getNormalizedPoint(e);
+        this.currentPoints = [pt];
+        
+        const color = this.activeLayerName === 'sketch' ? '#1A1A1A' : '#FF4800';
+        this.activePath.setAttribute('stroke', color);
+        this.activePath.setAttribute('d', this.denormalizePath(this.currentPoints));
     }
 
     onPointerMove(e) {
-        if (!this.isDrawing || !this.currentStroke) return;
-
+        if (!this.isDrawing) return;
         const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
-        const ctx = this.activeLayer === 'vector' ? this.ctxVector : this.ctxAnnotation;
-
         for (let evt of events) {
-            const pt = this.getPointerPoint(evt);
-            const pts = this.currentStroke.points;
-            pts.push(pt);
-
-            if (pts.length > 2) {
-                const p1 = pts[pts.length - 2];
-                const p2 = pts[pts.length - 1];
-                this.renderMidpointSegment(ctx, p1, p2, this.currentStroke.color, this.activeLayer);
-            }
+            this.currentPoints.push(this.getNormalizedPoint(evt));
         }
+        this.activePath.setAttribute('d', this.denormalizePath(this.currentPoints));
     }
 
     onPointerUp(e) {
-        if (!this.isDrawing || !this.currentStroke) return;
+        if (!this.isDrawing) return;
         this.isDrawing = false;
-
-        if (this.currentStroke.layer === 'vector') {
-            this.strokeData.vectorStrokes.push(this.currentStroke);
-        } else {
-            this.strokeData.annotationStrokes.push(this.currentStroke);
+        
+        if (this.currentPoints.length > 1) {
+            const stroke = { points: [...this.currentPoints] };
+            if (this.activeLayerName === 'sketch') {
+                this.vectorState.sketchStrokes.push(stroke);
+            } else {
+                this.vectorState.redlineStrokes.push(stroke);
+            }
         }
-
-        this.currentStroke = null;
+        
+        this.currentPoints = [];
+        this.activePath.setAttribute('d', '');
+        this.redrawAll();
         if (this.onStrokeEnd) this.onStrokeEnd();
     }
 
-    renderMidpointSegment(ctx, p1, p2, color, layer) {
-        const midX = (p1.x + p2.x) / 2;
-        const midY = (p1.y + p2.y) / 2;
-        
-        ctx.strokeStyle = color;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = (layer === 'vector' ? 1.5 : 2.5) * (p2.p * 2);
-
-        ctx.beginPath();
-        ctx.moveTo(p1.x, p1.y);
-        ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
-        ctx.stroke();
-    }
-
-    renderGrid() {
-        const ctx = this.ctxBg;
-        ctx.clearRect(0, 0, this.width, this.height);
-
-        if (this.strokeData.bgImageData) {
-            const img = new Image();
-            img.onload = () => ctx.drawImage(img, 0, 0, this.width, this.height);
-            img.src = this.strokeData.bgImageData;
-        } else {
-            ctx.strokeStyle = '#D1CDC4';
-            ctx.lineWidth = 0.5;
-            const step = 20;
-
-            ctx.beginPath();
-            for (let x = 0; x < this.width; x += step) {
-                ctx.moveTo(x, 0); ctx.lineTo(x, this.height);
-            }
-            for (let y = 0; y < this.height; y += step) {
-                ctx.moveTo(0, y); ctx.lineTo(this.width, y);
-            }
-            ctx.stroke();
-        }
-    }
-
-    redrawLayer(ctx, strokes) {
-        ctx.clearRect(0, 0, this.width, this.height);
-        for (let s of strokes) {
-            for (let i = 1; i < s.points.length; i++) {
-                this.renderMidpointSegment(ctx, s.points[i - 1], s.points[i], s.color, s.layer);
-            }
-        }
+    redrawGroup(groupEl, strokes) {
+        groupEl.innerHTML = '';
+        strokes.forEach(s => {
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', this.denormalizePath(s.points));
+            groupEl.appendChild(path);
+        });
     }
 
     redrawAll() {
-        this.redrawLayer(this.ctxVector, this.strokeData.vectorStrokes);
-        this.redrawLayer(this.ctxAnnotation, this.strokeData.annotationStrokes);
-    }
-
-    clearLayer() {
-        if (this.activeLayer === 'vector') {
-            this.strokeData.vectorStrokes = [];
-            this.ctxVector.clearRect(0, 0, this.width, this.height);
+        this.redrawGroup(this.layerSketch, this.vectorState.sketchStrokes);
+        this.redrawGroup(this.layerRedline, this.vectorState.redlineStrokes);
+        if (this.vectorState.bgImageData) {
+            this.bgImage.setAttributeNS('http://www.w3.org/1999/xlink', 'href', this.vectorState.bgImageData);
         } else {
-            this.strokeData.annotationStrokes = [];
-            this.ctxAnnotation.clearRect(0, 0, this.width, this.height);
+            this.bgImage.removeAttributeNS('http://www.w3.org/1999/xlink', 'href');
         }
     }
 
-    exportState() { return JSON.parse(JSON.stringify(this.strokeData)); }
-    
-    importState(data) {
-        this.strokeData = data || { vectorStrokes: [], annotationStrokes: [], bgImageData: null };
-        this.renderGrid();
+    clearActiveLayer() {
+        if (this.activeLayerName === 'sketch') {
+            this.vectorState.sketchStrokes = [];
+        } else {
+            this.vectorState.redlineStrokes = [];
+        }
+        this.redrawAll();
+    }
+
+    exportState() { return JSON.parse(JSON.stringify(this.vectorState)); }
+    importState(state) {
+        this.vectorState = state || { sketchStrokes: [], redlineStrokes: [], bgImageData: null };
         this.redrawAll();
     }
 }
