@@ -3,65 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AGENDA.ARCH // Vector Engine</title>
+    <title>ARCH.VECTOR // Engine</title>
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
-    <header class="header">
-        <div class="brand">SYSTEM // AGENDA.ARCH</div>
-        <div class="header-controls">
-            <div id="sync-status" class="status-indicator">
-                <span class="status-dot" id="status-dot"></span>
-                <span id="status-text">OFFLINE READY</span>
-            </div>
-            <button id="btn-clear" type="button">Clear Active Layer</button>
-            <button id="btn-sync" type="button" class="btn-primary">Sync Endpoint</button>
+    <header class="app-header">
+        <div class="brand-id" id="brand-title">ARCH.VECTOR</div>
+        <div class="header-status">
+            <span class="status-indicator" id="status-dot"></span>
+            <span class="status-label" id="status-text">SYSTEM READY</span>
+        </div>
+        <div class="header-actions">
+            <button id="btn-clear" type="button">Clear Layer</button>
+            <button id="btn-sync" type="button" class="btn-primary">Sync to Cloud</button>
         </div>
     </header>
 
-    <main class="main-layout">
-        <aside class="sidebar">
-            <div class="field-group">
+    <main class="app-viewport">
+        <!-- Responsive Control Panel Drawer -->
+        <aside class="control-panel">
+            <div class="panel-section">
                 <label for="meta-date">Date Index</label>
                 <input type="date" id="meta-date">
             </div>
 
-            <div class="field-group">
-                <label for="meta-topic">Tags / Topic</label>
-                <input type="text" id="meta-topic" placeholder="e.g. #Elevation #Detail">
+            <div class="panel-section">
+                <label for="meta-topic">Project / Tags</label>
+                <input type="text" id="meta-topic" placeholder="e.g. #SitePlan #Elevation">
             </div>
 
-            <div class="field-group">
-                <label for="meta-summary">Summary (Scribble)</label>
-                <textarea id="meta-summary" placeholder="Write entry summary..."></textarea>
+            <div class="panel-section">
+                <label for="meta-summary">Field Summary</label>
+                <textarea id="meta-summary" placeholder="Architectural notes & observations..."></textarea>
             </div>
 
-            <div class="field-group">
-                <label>Active Ink Layer</label>
-                <div class="segmented-control">
-                    <button id="btn-layer-vector" type="button" class="active">Sketch (L2)</button>
-                    <button id="btn-layer-annotation" type="button">Redline (L3)</button>
+            <div class="panel-section">
+                <label>Active Tool</label>
+                <div class="tool-selector">
+                    <button id="tool-draw" type="button" class="active">Sketch Layer</button>
+                    <button id="tool-redline" type="button">Redline Layer</button>
                 </div>
             </div>
 
-            <div class="field-group">
-                <label>Background Blueprint</label>
-                <input type="file" id="file-bg-input" accept="image/*" class="is-hidden">
-                <label for="file-bg-input" class="btn-label">Upload Blueprint</label>
+            <div class="panel-section">
+                <label>Blueprint Attachment</label>
+                <input type="file" id="file-bg" accept="image/*" class="is-hidden">
+                <label for="file-bg" class="btn-file-label">Upload Overlay</label>
             </div>
         </aside>
 
-        <section class="workspace" id="workspace">
-            <div class="canvas-viewport" id="canvas-container">
-                <canvas id="layer-bg"></canvas>
-                <canvas id="layer-vector"></canvas>
-                <canvas id="layer-annotation"></canvas>
+        <!-- Spatial Vector Canvas Workspace -->
+        <section class="spatial-workspace" id="workspace">
+            <div class="svg-container" id="canvas-container">
+                <svg id="vector-svg" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <pattern id="grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+                            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#D1CDC4" stroke-width="0.5"/>
+                        </pattern>
+                    </defs>
+                    <rect id="bg-grid" width="100%" height="100%" fill="url(#grid-pattern)" />
+                    <image id="svg-bg-image" x="0" y="0" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
+                    <g id="layer-sketch" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></g>
+                    <g id="layer-redline" stroke="#FF4800" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"></g>
+                    <path id="active-path" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                </svg>
             </div>
         </section>
     </main>
 
-    <!-- Application Engine Stack -->
+    <!-- Core Runtime Modules -->
     <script src="js/config.js"></script>
     <script src="js/db.js"></script>
     <script src="js/canvas.js"></script>
@@ -69,4 +80,3 @@
     <script src="js/app.js"></script>
 </body>
 </html>
-
