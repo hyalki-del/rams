@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Agenda & Vector Note-Taking System</title>
+    <style>
+        /* ==========================================================================
+           Dieter Rams Design System
+           Principles: Neutrality, High Contrast Ratio, Functional Grids, Minimalism
+           ========================================================================== */
+        :root {
+            --bg-color: #E8E5DF;          /* Light warm grey canvas */
+            --panel-bg: #F4F2ED;        /* Off-white paper layer */
+            --text-primary: #1A1A1A;    /* Near black typography */
+            --text-secondary: #767676;  /* Neutral mid-grey */
+            --border-color: #1A1A1A;    /* Stark structural borders */
+            --accent-orange: #FF4800;   /* Rams signature accent color */
+            --grid-line: #D1CDC4;       /* Subtle architectural grid line */
+            --font-mono: "SF Mono", "Courier New", Courier, monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Control Bar */
+        header {
+            height: 54px;
+            border-bottom: 2px solid var(--border-color);
+            background: var(--panel-bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .brand-title {
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand-title::before {
+            content: "";
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: var(--accent-orange);
+            border-radius: 50%;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        button, label.btn-label {
+            background: var(--panel-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.15s ease;
+        }
+
+        button:active, button.active, label.btn-label:active {
+            background: var(--text-primary);
+            color: var(--panel-bg);
+        }
+
+        button.accent {
+            border-color: var(--accent-orange);
+            color: var(--accent-orange);
+        }
+
+        button.accent:active, button.accent.active {
+            background: var(--accent-orange);
+            color: #FFFFFF;
+        }
+
+        /* App Layout Grid */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            height: calc(100vh - 54px);
+        }
+
+        /* Metadata Sidebar */
+        aside {
+            border-right: 2px solid var(--border-color);
+            background: var(--panel-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        input[type="text"], input[type="date"], textarea {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            border-radius: 0;
+            padding: 8px 10px;
+            font-family: var(--font-sans);
+            font-size: 14px;
+            color: var(--text-primary);
+            outline: none;
+            -webkit-user-select: text;
+            user-select: text;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--accent-orange);
+        }
+
+        textarea {
+            resize: none;
+            height: 100px;
+        }
+
+        .layer-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        /* Spatial Canvas Engine Workspace */
+        .workspace {
+            position: relative;
+            background-color: var(--bg-color);
+            overflow: hidden;
+            touch-action: none; /* Prevents touch scrolling for pen capture */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: #FFFFFF;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        #layer-bg { z-index: 1; }
+        #layer-vector { z-index: 2; }
+        #layer-annotation { z-index: 3; }
+
+        /* Status Indicator */
+        #sync-status {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--text-secondary);
+        }
+
+        .dot.synced { background-color: #00AA44; }
+        .dot.syncing { background-color: var(--accent-orange); }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand-title">SYSTEM // AGENDA.ARCH</div>
+        <div class="toolbar">
+            <span id="sync-status"><span class="dot" id="status-dot"></span><span id="status-text">OFFLINE READY</span></span>
+            <button id="btn-clear">Clear Layer</button>
+            <button id="btn-sync" class="accent">Sync Endpoint</button>
+        </div>
+    </header>
+
+    <main>
+        <aside>
+            <div class="form-group">
+                <label for="meta-date">Date Index</label>
+                <input type="date" id="meta-date">
+            </div>
+
+            <div class="form-group">
+                <label for="meta-topic">Topic / Hash Tags</label>
+                <input type="text" id="meta-topic" placeholder="e.g. #Elevation #SiteVisit">
+            </div>
+
+            <div class="form-group">
+                <label for="meta-summary">Architectural Summary (Scribble)</label>
+                <textarea id="meta-summary" placeholder="Write field notes or summary..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Active Ink Layer</label>
+                <div class="layer-selector">
+                    <button id="btn-layer-vector" class="active">Sketch (L2)</button>
+                    <button id="btn-layer-annotation">Redline (L3)</button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 10px;">
+                <label>Background Blueprint</label>
+                <input type="file" id="file-bg-input" accept="image/*" style="display: none;">
+                <label for="file-bg-input" class="btn-label" style="text-align: center;">Upload Background Asset</label>
+            </div>
+
+            <div class="form-group" style="margin-top: auto;">
+                <button id="btn-load-local">Reload Last Local State</button>
+            </div>
+        </aside>
+
+        <section class="workspace" id="workspace">
+            <div class="canvas-container" id="canvas-container">
+                <canvas id="layer-bg"></canvas>
+                <canvas id="layer-vector"></canvas>
+                <canvas id="layer-annotation"></canvas>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        /**
+         * System Configuration Constants
+         */
+        const CONFIG = {
+            GAS_ENDPOINT: 'YOUR_GOOGLE_APPS_SCRIPT_EXEC_URL', // Insert published web app endpoint
+            DB_NAME: 'ArchitecturalAgendaDB',
+            DB_VERSION: 1,
+            DEFAULT_STROKE_COLOR_L2: '#1A1A1A',
+            DEFAULT_STROKE_COLOR_L3: '#FF4800'
+        };
+
+        /**
+         * IndexedDB Storage Wrapper (Zero Dependency Client Database)
+         */
+        class LocalStorageEngine {
+            constructor() { this.db = null; }
+
+            async init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains('entries')) {
+                            db.createObjectStore('entries', { keyPath: 'entryId' });
+                        }
+                    };
+                    request.onsuccess = (e) => {
+                        this.db = e.target.result;
+                        resolve();
+                    };
+                    request.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            async saveEntry(entry) {
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction('entries', 'readwrite');
+                    const store = tx.objectStore('entries');
+                    store.put(entry);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            async getEntry(entryId) {
+                return new Promise((resolve, reject) => {
+                    const tx = this.db.transaction('entries', 'readonly');
+                    const store = tx.objectStore('entries');
+                    const request = store.get(entryId);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = (e) => reject(e.target.error);
+                });
+            }
+        }
+
+        /**
+         * Multi-Layer Vector Inking Engine
+         */
+        class SpatialInkingEngine {
+            constructor(containerEl, onStrokeComplete) {
+                this.container = containerEl;
+                this.onStrokeComplete = onStrokeComplete;
+
+                this.cvsBg = document.getElementById('layer-bg');
+                this.cvsVector = document.getElementById('layer-vector');
+                this.cvsAnnotation = document.getElementById('layer-annotation');
+
+                this.ctxBg = this.cvsBg.getContext('2d');
+                this.ctxVector = this.cvsVector.getContext('2d');
+                this.ctxAnnotation = this.cvsAnnotation.getContext('2d');
+
+                this.activeLayer = 'vector'; // 'vector' or 'annotation'
+                this.isDrawing = false;
+                this.currentStroke = null;
+
+                // Document-level Stroke Vector Data Model
+                this.strokeData = {
+                    vectorStrokes: [],
+                    annotationStrokes: [],
+                    bgImageData: null
+                };
+
+                this.initCanvasSize();
+                this.bindPointerEvents();
+                window.addEventListener('resize', () => this.handleResize());
+            }
+
+            initCanvasSize() {
+                const rect = this.container.getBoundingClientRect();
+                this.dpr = window.devicePixelRatio || 1;
+
+                [this.cvsBg, this.cvsVector, this.cvsAnnotation].forEach(cvs => {
+                    cvs.width = rect.width * this.dpr;
+                    cvs.height = rect.height * this.dpr;
+                    const ctx = cvs.getContext('2d');
+                    ctx.scale(this.dpr, this.dpr);
+                });
+
+                this.viewportWidth = rect.width;
+                this.viewportHeight = rect.height;
+
+                this.renderBackgroundGrid();
+                this.redrawAll();
+            }
+
+            handleResize() {
+                // Re-initialize size and redraw continuous vector mathematical model
+                this.initCanvasSize();
+            }
+
+            setActiveLayer(layerName) {
+                this.activeLayer = layerName;
+            }
+
+            renderBackgroundGrid() {
+                const ctx = this.ctxBg;
+                ctx.clearRect(0, 0, this.viewportWidth, this.viewportHeight);
+
+                if (this.strokeData.bgImageData) {
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.drawImage(img, 0, 0, this.viewportWidth, this.viewportHeight);
+                    };
+                    img.src = this.strokeData.bgImageData;
+                } else {
+                    // Render Architectural Grid Baseline
+                    ctx.strokeStyle = '#D1CDC4';
+                    ctx.lineWidth = 0.5;
+                    const gridSize = 20;
+
+                    ctx.beginPath();
+                    for (let x = 0; x < this.viewportWidth; x += gridSize) {
+                        ctx.moveTo(x, 0);
+                        ctx.lineTo(x, this.viewportHeight);
+                    }
+                    for (let y = 0; y < this.viewportHeight; y += gridSize) {
+                        ctx.moveTo(0, y);
+                        ctx.lineTo(this.viewportWidth, y);
+                    }
+                    ctx.stroke();
+                }
+            }
+
+            bindPointerEvents() {
+                // Attach event listener directly to topmost interactive canvas layer
+                const target = this.cvsAnnotation;
+
+                target.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
+                target.addEventListener('pointermove', (e) => this.handlePointerMove(e));
+                target.addEventListener('pointerup', (e) => this.handlePointerUp(e));
+                target.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
+            }
+
+            getCanvasCoordinates(e) {
+                const rect = this.cvsAnnotation.getBoundingClientRect();
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                    pressure: e.pressure !== undefined && e.pressure !== 0 ? e.pressure : 0.5,
+                    altitudeAngle: e.altitudeAngle || 0,
+                    azimuthAngle: e.azimuthAngle || 0,
+                    timestamp: Date.now()
+                };
+            }
+
+            handlePointerDown(e) {
+                // Stylus isolation filter: ignore touch events if strict pencil mode is desired
+                if (e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
+
+                this.isDrawing = true;
+                target.setPointerCapture(e.pointerId);
+
+                const point = this.getCanvasCoordinates(e);
+                const color = this.activeLayer === 'vector' ? CONFIG.DEFAULT_STROKE_COLOR_L2 : CONFIG.DEFAULT_STROKE_COLOR_L3;
+
+                this.currentStroke = {
+                    color: color,
+                    layer: this.activeLayer,
+                    points: [point]
+                };
+            }
+
+            handlePointerMove(e) {
+                if (!this.isDrawing || !this.currentStroke) return;
+
+                // Sub-pixel 240Hz coalesced pointer event extraction for high-precision Apple Pencil tracking
+                const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e];
+                
+                const ctx = this.activeLayer === 'vector' ? this.ctxVector : this.ctxAnnotation;
+
+                for (let event of events) {
+                    const pt = this.getCanvasCoordinates(event);
+                    const prevPt = this.currentStroke.points[this.currentStroke.points.length - 1];
+                    
+                    this.currentStroke.points.push(pt);
+                    this.renderSegment(ctx, prevPt, pt, this.currentStroke.color);
+                }
+            }
+
+            handlePointerUp(e) {
+                if (!this.isDrawing || !this.currentStroke) return;
+                this.isDrawing = false;
+
+                if (this.currentStroke.layer === 'vector') {
+                    this.strokeData.vectorStrokes.push(this.currentStroke);
+                } else {
+                    this.strokeData.annotationStrokes.push(this.currentStroke);
+                }
+
+                const strokeRef = this.currentStroke;
+                this.currentStroke = null;
+                
+                if (this.onStrokeComplete) {
+                    this.onStrokeComplete(strokeRef);
+                }
+            }
+
+            /**
+             * Linear Interpolation with Dynamic Pressure-based Radial Width Engine
+             */
+            renderSegment(ctx, p1, p2, color) {
+                ctx.strokeStyle = color;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+
+                // Map pen pressure to dynamic line thickness
+                const baseWidth = this.activeLayer === 'vector' ? 1.5 : 2.5;
+                const width = baseWidth * (p2.pressure * 2.0);
+
+                ctx.lineWidth = width;
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+            }
+
+            redrawLayer(ctx, strokeArray) {
+                ctx.clearRect(0, 0, this.viewportWidth, this.viewportHeight);
+                for (let stroke of strokeArray) {
+                    for (let i = 1; i < stroke.points.length; i++) {
+                        this.renderSegment(ctx, stroke.points[i - 1], stroke.points[i], stroke.color);
+                    }
+                }
+            }
+
+            redrawAll() {
+                this.redrawLayer(this.ctxVector, this.strokeData.vectorStrokes);
+                this.redrawLayer(this.ctxAnnotation, this.strokeData.annotationStrokes);
+            }
+
+            clearActiveLayer() {
+                if (this.activeLayer === 'vector') {
+                    this.strokeData.vectorStrokes = [];
+                    this.ctxVector.clearRect(0, 0, this.viewportWidth, this.viewportHeight);
+                } else {
+                    this.strokeData.annotationStrokes = [];
+                    this.ctxAnnotation.clearRect(0, 0, this.viewportWidth, this.viewportHeight);
+                }
+            }
+
+            setBackgroundImage(base64Image) {
+                this.strokeData.bgImageData = base64Image;
+                this.renderBackgroundGrid();
+            }
+
+            exportState() {
+                return JSON.parse(JSON.stringify(this.strokeData));
+            }
+
+            importState(data) {
+                this.strokeData = data || { vectorStrokes: [], annotationStrokes: [], bgImageData: null };
+                this.renderBackgroundGrid();
+                this.redrawAll();
+            }
+        }
+
+        /**
+         * Client Application Coordinator
+         */
+        class ApplicationController {
+            constructor() {
+                this.dbEngine = new LocalStorageEngine();
+                this.inkingEngine = null;
+                this.currentEntryId = new Date().toISOString().split('T')[0]; // Default entry key: YYYY-MM-DD
+            }
+
+            async bootstrap() {
+                await this.dbEngine.init();
+
+                const container = document.getElementById('canvas-container');
+                this.inkingEngine = new SpatialInkingEngine(container, () => this.handleAutoSave());
+
+                this.bindUI();
+                this.loadEntry(this.currentEntryId);
+            }
+
+            bindUI() {
+                document.getElementById('meta-date').value = this.currentEntryId;
+
+                // Inputs change handler
+                ['meta-date', 'meta-topic', 'meta-summary'].forEach(id => {
+                    document.getElementById(id).addEventListener('input', () => this.handleAutoSave());
+                });
+
+                document.getElementById('meta-date').addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        this.currentEntryId = e.target.value;
+                        this.loadEntry(this.currentEntryId);
+                    }
+                });
+
+                // Layer Toggle Control
+                const btnL2 = document.getElementById('btn-layer-vector');
+                const btnL3 = document.getElementById('btn-layer-annotation');
+
+                btnL2.addEventListener('click', () => {
+                    btnL2.classList.add('active');
+                    btnL3.classList.remove('active');
+                    this.inkingEngine.setActiveLayer('vector');
+                });
+
+                btnL3.addEventListener('click', () => {
+                    btnL3.classList.add('active');
+                    btnL2.classList.remove('active');
+                    this.inkingEngine.setActiveLayer('annotation');
+                });
+
+                // File Upload Base Blueprint Engine
+                document.getElementById('file-bg-input').addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                            this.inkingEngine.setBackgroundImage(event.target.result);
+                            this.handleAutoSave();
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+
+                document.getElementById('btn-clear').addEventListener('click', () => {
+                    this.inkingEngine.clearActiveLayer();
+                    this.handleAutoSave();
+                });
+
+                document.getElementById('btn-sync').addEventListener('click', () => this.syncToRemoteEndpoint());
+                document.getElementById('btn-load-local').addEventListener('click', () => this.loadEntry(this.currentEntryId));
+            }
+
+            updateStatus(state, text) {
+                const dot = document.getElementById('status-dot');
+                const label = document.getElementById('status-text');
+                dot.className = 'dot ' + state;
+                label.innerText = text;
+            }
+
+            async handleAutoSave() {
+                this.updateStatus('syncing', 'SAVING LOCAL...');
+                
+                const entry = {
+                    entryId: this.currentEntryId,
+                    date: document.getElementById('meta-date').value,
+                    topic: document.getElementById('meta-topic').value,
+                    summary: document.getElementById('meta-summary').value,
+                    spatialData: this.inkingEngine.exportState(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                await this.dbEngine.saveEntry(entry);
+                this.updateStatus('synced', 'LOCAL SAVED');
+            }
+
+            async loadEntry(entryId) {
+                const entry = await this.dbEngine.getEntry(entryId);
+                if (entry) {
+                    document.getElementById('meta-topic').value = entry.topic || '';
+                    document.getElementById('meta-summary').value = entry.summary || '';
+                    this.inkingEngine.importState(entry.spatialData);
+                    this.updateStatus('synced', 'LOADED FROM INDEXEDDB');
+                } else {
+                    document.getElementById('meta-topic').value = '';
+                    document.getElementById('meta-summary').value = '';
+                    this.inkingEngine.importState(null);
+                    this.updateStatus('', 'NEW ENTRY');
+                }
+            }
+
+            async syncToRemoteEndpoint() {
+                if (!CONFIG.GAS_ENDPOINT || CONFIG.GAS_ENDPOINT.includes('YOUR_GOOGLE_APPS_SCRIPT_EXEC_URL')) {
+                    alert('Configuration required: Set your valid Google Apps Script URL in CONFIG.GAS_ENDPOINT');
+                    return;
+                }
+
+                this.updateStatus('syncing', 'SYNCING GOOGLE DRIVE...');
+
+                const entry = await this.dbEngine.getEntry(this.currentEntryId);
+                if (!entry) return;
+
+                try {
+                    // CORS POST payload transmission using native text/plain bypass trick
+                    const response = await fetch(CONFIG.GAS_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(entry)
+                    });
+
+                    const resData = await response.json();
+                    if (resData.status === 'SUCCESS') {
+                        this.updateStatus('synced', 'CLOUD SYNCED');
+                    } else {
+                        throw new Error(resData.message);
+                    }
+                } catch (err) {
+                    console.error('Remote Sync Error:', err);
+                    this.updateStatus('', 'SYNC FAILED');
+                    alert('Sync Error: ' + err.message);
+                }
+            }
+        }
+
+        // Initialize Runtime System
+        window.addEventListener('DOMContentLoaded', () => {
+            const app = new ApplicationController();
+            app.bootstrap();
+        });
+    </script>
+</body>
+</html>
