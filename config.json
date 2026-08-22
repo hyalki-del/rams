@@ -1,9 +1,5 @@
 {
   "GAS_ENDPOINT": "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec",
-  "DB_NAME": "ArchitecturalAgendaDB",
-  "DB_VERSION": 1,
-  "STROKE_COLORS": {
-    "vector": "#1A1A1A",
-    "annotation": "#FF4800"
-  }
+  "APP_TITLE": "ARCH.VECTOR // SYSTEM",
+  "GRID_SIZE": 20
 }
