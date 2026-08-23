@@ -392,7 +392,7 @@
 
     <footer>
       <span id="pointerMetrics">X: 0000 | Y: 0000 | P: 0.00</span>
-      <span id="configStatus">SYSTEM: EMBEDDED_STANDALONE</span>
+      <span id="configStatus">SYSTEM: LOADING_CONFIG</span>
     </footer>
   </div>
 
@@ -400,10 +400,28 @@
     // --- Application State ---
     const AppState = {
       currentDate: new Date().toISOString().split('T')[0],
-      googleAppsScriptEndpoint: "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec",
+      googleAppsScriptEndpoint: null,
       db: null,
       agenda: {}
     };
+
+    // --- Configuration Bootstrapper ---
+    async function loadConfig() {
+      const configStatusEl = document.getElementById('configStatus');
+      try {
+        const response = await fetch('./config.json');
+        if (!response.ok) throw new Error(`HTTP_${response.status}`);
+        const config = await response.json();
+        
+        AppState.googleAppsScriptEndpoint = config.googleAppsScriptEndpoint || "";
+        configStatusEl.innerText = "SYSTEM: CONFIG_LOADED";
+      } catch (err) {
+        console.warn("Could not load config.json, using fallback endpoint settings:", err);
+        // Default fallback endpoint
+        AppState.googleAppsScriptEndpoint = "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec";
+        configStatusEl.innerText = "SYSTEM: CONFIG_FALLBACK";
+      }
+    }
 
     function getCurrentAgenda() {
       if (!AppState.agenda[AppState.currentDate]) {
@@ -699,7 +717,6 @@
     function calculateOverlappingColumns(topics) {
       if (!topics || topics.length === 0) return [];
 
-      // Sort topics by start hour, then duration
       const sorted = topics.map(t => ({ ...t })).sort((a, b) => {
         if (a.startHour !== b.startHour) return a.startHour - b.startHour;
         return b.durationHours - a.durationHours;
@@ -709,7 +726,6 @@
       let currentCluster = [];
       let clusterEnd = -1;
 
-      // Group overlapping topics into connected components (clusters)
       sorted.forEach(t => {
         const endHour = t.startHour + t.durationHours;
         if (t.startHour < clusterEnd) {
@@ -723,7 +739,6 @@
       });
       if (currentCluster.length > 0) clusters.push(currentCluster);
 
-      // Pack columns within each cluster
       const computedLayout = [];
       clusters.forEach(cluster => {
         const columns = [];
@@ -804,7 +819,6 @@
         card.style.top = `${topic.startHour * HOUR_HEIGHT}px`;
         card.style.height = `${Math.max(topic.durationHours * HOUR_HEIGHT, 60)}px`;
 
-        // Apply overlapping frame metrics
         const layout = layoutMap.get(topic.id) || { columnIndex: 0, totalColumns: 1 };
         const colWidthPercent = 100 / layout.totalColumns;
         const leftOffsetPercent = layout.columnIndex * colWidthPercent;
@@ -861,7 +875,6 @@
       let initialDuration = 0;
       let longPressTimer = null;
 
-      // 1000ms Delay Drag Pointer Handler
       header.addEventListener('pointerdown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
         
@@ -878,7 +891,6 @@
 
       header.addEventListener('pointermove', (e) => {
         if (!isDragging) {
-          // Cancel timer if finger moves > 5px before 1000ms threshold
           if (longPressTimer && Math.abs(e.clientY - startY) > 5) {
             clearTimeout(longPressTimer);
             longPressTimer = null;
@@ -895,7 +907,6 @@
         card.querySelector('.time-badge').innerText =
           `${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}`;
 
-        // Dynamic re-render during drag for instant grid response
         renderAgendaView();
       });
 
@@ -915,7 +926,6 @@
       header.addEventListener('pointerup', cancelOrEndDrag);
       header.addEventListener('pointercancel', cancelOrEndDrag);
 
-      // Resizing logic
       resizeHandle.addEventListener('pointerdown', (e) => {
         isResizing = true;
         startY = e.clientY;
@@ -992,6 +1002,7 @@
     }
 
     (async function boot() {
+      await loadConfig();
       await initDB();
       bindGlobalControls();
       await loadDateState(AppState.currentDate);
