@@ -1,82 +1,444 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ARCH.VECTOR // Engine</title>
-    <link rel="stylesheet" href="css/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ARCH_LOG // Architectural Agenda & Spatial Logbook</title>
+  
+  <!-- PWA & iPadOS Standalone Execution Metadata -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#F4F4F0">
+
+  <style>
+    /* ==========================================================================
+       Dieter Rams Visual System (Neutral Paper, Single-Pixel Dividers, Signal Orange)
+       ========================================================================== */
+    :root {
+      --bg-paper: #F4F4F0;
+      --panel-bg: #EAEAE5;
+      --border-color: #D1D1CD;
+      --border-dark: #1C1C1A;
+      --text-main: #1C1C1A;
+      --text-muted: #7A7A75;
+      --signal-orange: #FF4B00;
+      --font-mono: 'SF Mono', 'Courier New', Courier, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; touch-action: none; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: var(--bg-paper); color: var(--text-main); font-family: var(--font-sans); font-size: 13px; }
+
+    #app-container {
+      display: grid;
+      grid-template-rows: 48px 32px 1fr 24px;
+      width: 100vw;
+      height: 100vh;
+      border: 1px solid var(--border-dark);
+    }
+
+    header {
+      grid-row: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: var(--bg-paper);
+      border-bottom: 1px solid var(--border-dark);
+      font-family: var(--font-mono);
+    }
+
+    .brand { font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+    .brand-accent { width: 8px; height: 8px; background: var(--signal-orange); }
+
+    .date-shuffler {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 4px 8px;
+    }
+
+    .btn {
+      background: transparent;
+      border: 1px solid var(--border-dark);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 8px;
+    }
+    .btn:active { background: var(--text-main); color: var(--bg-paper); }
+    .btn-orange { background: var(--signal-orange); color: #FFFFFF; border: none; }
+
+    #context-banner {
+      grid-row: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .tag { color: var(--text-main); background: var(--bg-paper); padding: 2px 6px; border: 1px solid var(--border-color); margin-right: 4px; }
+
+    #viewport {
+      grid-row: 3;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-image: radial-gradient(circle, #D1D1CD 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    canvas.canvas-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    #bgCanvas { z-index: 10; }
+    #drawCanvas { z-index: 20; }
+    #redlineCanvas { z-index: 30; }
+
+    #layer-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 40;
+      background: var(--bg-paper);
+      border: 1px solid var(--border-dark);
+      padding: 12px;
+      width: 200px;
+      font-family: var(--font-mono);
+    }
+
+    .text-node-card {
+      position: absolute;
+      z-index: 35;
+      background: var(--bg-paper);
+      border: 1px solid var(--border-dark);
+      border-left: 3px solid var(--signal-orange);
+      padding: 6px 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      pointer-events: auto;
+    }
+
+    footer {
+      grid-row: 4;
+      background: var(--panel-bg);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+  </style>
 </head>
 <body>
 
-    <header class="app-header">
-        <div class="brand-id" id="brand-title">ARCH.VECTOR</div>
-        <div class="header-status">
-            <span class="status-indicator" id="status-dot"></span>
-            <span class="status-label" id="status-text">SYSTEM READY</span>
-        </div>
-        <div class="header-actions">
-            <button id="btn-clear" type="button">Clear Layer</button>
-            <button id="btn-sync" type="button" class="btn-primary">Sync to Cloud</button>
-        </div>
+  <div id="app-container">
+    <header>
+      <div class="brand"><div class="brand-accent"></div><span>ARCH_LOG // ONLINE</span></div>
+      <div class="date-shuffler">
+        <button class="btn" id="prevDateBtn">[◄ PREV]</button>
+        <span id="currentDateDisplay">2026.08.23</span>
+        <button class="btn" id="nextDateBtn">[NEXT ►]</button>
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <button class="btn" id="importImgBtn">IMPORT BG</button>
+        <button class="btn btn-orange" id="cloudSyncBtn">CLOUD SYNC</button>
+        <button class="btn" id="exportBtn">EXPORT JSON</button>
+        <input type="file" id="imgFileInput" accept="image/*" style="display:none;">
+      </div>
     </header>
 
-    <main class="app-viewport">
-        <!-- Responsive Control Panel Drawer -->
-        <aside class="control-panel">
-            <div class="panel-section">
-                <label for="meta-date">Date Index</label>
-                <input type="date" id="meta-date">
-            </div>
+    <div id="context-banner">
+      <div><span class="tag">TOPIC: #SITE_A1</span><span class="tag">#ELEVATION</span></div>
+      <div id="storageStatus">STORAGE: IDB_ONLINE</div>
+    </div>
 
-            <div class="panel-section">
-                <label for="meta-topic">Project / Tags</label>
-                <input type="text" id="meta-topic" placeholder="e.g. #SitePlan #Elevation">
-            </div>
+    <div id="viewport">
+      <canvas id="bgCanvas" class="canvas-layer"></canvas>
+      <canvas id="drawCanvas" class="canvas-layer"></canvas>
+      <canvas id="redlineCanvas" class="canvas-layer"></canvas>
 
-            <div class="panel-section">
-                <label for="meta-summary">Field Summary</label>
-                <textarea id="meta-summary" placeholder="Architectural notes & observations..."></textarea>
-            </div>
+      <div id="layer-panel">
+        <div style="font-weight:700; margin-bottom:8px; border-bottom:1px solid var(--border-color);">LAYERS</div>
+        <div style="margin-bottom:4px;"><label><input type="radio" name="activeLayer" value="L2_PENCIL" checked> L2: Ink Pencil</label></div>
+        <div style="margin-bottom:8px;"><label><input type="radio" name="activeLayer" value="L3_REDLINE"> L3: Redline Mark</label></div>
+        <button class="btn btn-orange" id="convertOcrBtn" style="width:100%; margin-bottom:4px;">[ RECOGNIZE TEXT ]</button>
+        <button class="btn" id="clearBtn" style="width:100%;">CLEAR LAYER</button>
+      </div>
 
-            <div class="panel-section">
-                <label>Active Tool</label>
-                <div class="tool-selector">
-                    <button id="tool-draw" type="button" class="active">Sketch Layer</button>
-                    <button id="tool-redline" type="button">Redline Layer</button>
-                </div>
-            </div>
+      <!-- Invisible Native WebKit Scribble Bridge -->
+      <textarea id="scribbleBridge" style="position:absolute; opacity:0; pointer-events:none; z-index:5; width:1px; height:1px;"></textarea>
+    </div>
 
-            <div class="panel-section">
-                <label>Blueprint Attachment</label>
-                <input type="file" id="file-bg" accept="image/*" class="is-hidden">
-                <label for="file-bg" class="btn-file-label">Upload Overlay</label>
-            </div>
-        </aside>
+    <footer>
+      <span id="pointerMetrics">X: 0000 | Y: 0000 | P: 0.00</span>
+      <span>RUNTIME: GITHUB_PAGES_HOSTED</span>
+    </footer>
+  </div>
 
-        <!-- Spatial Vector Canvas Workspace -->
-        <section class="spatial-workspace" id="workspace">
-            <div class="svg-container" id="canvas-container">
-                <svg id="vector-svg" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <pattern id="grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
-                            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#D1CDC4" stroke-width="0.5"/>
-                        </pattern>
-                    </defs>
-                    <rect id="bg-grid" width="100%" height="100%" fill="url(#grid-pattern)" />
-                    <image id="svg-bg-image" x="0" y="0" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />
-                    <g id="layer-sketch" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></g>
-                    <g id="layer-redline" stroke="#FF4800" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"></g>
-                    <path id="active-path" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                </svg>
-            </div>
-        </section>
-    </main>
+  <script type="module">
+    // Configure your deployed Google Apps Script Endpoint URL here:
+    const GOOGLE_GAS_ENDPOINT = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
 
-    <!-- Core Runtime Modules -->
-    <script src="js/config.js"></script>
-    <script src="js/db.js"></script>
-    <script src="js/canvas.js"></script>
-    <script src="js/sync.js"></script>
-    <script src="js/app.js"></script>
+    const AppState = {
+      currentDate: new Date().toISOString().split('T')[0],
+      activeLayer: 'L2_PENCIL',
+      isDrawing: false,
+      currentStroke: null,
+      strokes: [],
+      textNodes: [],
+      bgTransform: null,
+      db: null
+    };
+
+    const viewport = document.getElementById('viewport');
+    const bgCanvas = document.getElementById('bgCanvas');
+    const drawCanvas = document.getElementById('drawCanvas');
+    const redlineCanvas = document.getElementById('redlineCanvas');
+
+    const bgCtx = bgCanvas.getContext('2d');
+    const drawCtx = drawCanvas.getContext('2d');
+    const redlineCtx = redlineCanvas.getContext('2d');
+
+    // --- IndexedDB Local Persistence Engine ---
+    async function initDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('ArchLogbookDB', 1);
+        req.onupgradeneeded = (e) => e.target.result.createObjectStore('entries', { keyPath: 'isoDate' });
+        req.onsuccess = (e) => { AppState.db = e.target.result; resolve(AppState.db); };
+        req.onerror = reject;
+      });
+    }
+
+    async function loadEntry(isoDate) {
+      if (!AppState.db) return;
+      const tx = AppState.db.transaction('entries', 'readonly');
+      const req = tx.objectStore('entries').get(isoDate);
+      req.onsuccess = () => {
+        const record = req.result;
+        AppState.strokes = record?.strokes || [];
+        AppState.textNodes = record?.textNodes || [];
+        AppState.bgTransform = record?.background || null;
+        redrawAllLayers();
+      };
+    }
+
+    async function saveEntry() {
+      if (!AppState.db) return;
+      const payload = {
+        isoDate: AppState.currentDate,
+        updatedAt: Date.now(),
+        strokes: AppState.strokes,
+        textNodes: AppState.textNodes,
+        background: AppState.bgTransform
+      };
+      const tx = AppState.db.transaction('entries', 'readwrite');
+      tx.objectStore('entries').put(payload);
+    }
+
+    // --- Canvas Resize & Rendering ---
+    function resizeCanvases() {
+      const rect = viewport.getBoundingClientRect();
+      [bgCanvas, drawCanvas, redlineCanvas].forEach(canvas => {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+      });
+      redrawAllLayers();
+    }
+    window.addEventListener('resize', resizeCanvases);
+
+    function redrawAllLayers() {
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      redlineCtx.clearRect(0, 0, redlineCanvas.width, redlineCanvas.height);
+
+      if (AppState.bgTransform?.base64Data) {
+        const img = new Image();
+        img.src = AppState.bgTransform.base64Data;
+        img.onload = () => bgCtx.drawImage(img, 0, 0);
+      }
+
+      AppState.strokes.forEach(s => renderStroke(s.layerId === 'L3_REDLINE' ? redlineCtx : drawCtx, s));
+      renderTextNodes();
+    }
+
+    function renderStroke(ctx, stroke) {
+      if (!stroke.points || stroke.points.length < 2) return;
+      ctx.save();
+      ctx.strokeStyle = stroke.color;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+      for (let i = 1; i < stroke.points.length - 1; i++) {
+        const midX = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
+        const midY = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
+        ctx.lineWidth = (stroke.points[i].pressure || 0.5) * stroke.width * 2;
+        ctx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, midX, midY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(midX, midY);
+      }
+      ctx.restore();
+    }
+
+    function renderTextNodes() {
+      document.querySelectorAll('.text-node-card').forEach(e => e.remove());
+      AppState.textNodes.forEach(node => {
+        const card = document.createElement('div');
+        card.className = 'text-node-card';
+        card.style.left = `${node.boundingBox.x}px`;
+        card.style.top = `${node.boundingBox.y}px`;
+        card.innerText = node.rawText;
+        viewport.appendChild(card);
+      });
+    }
+
+    // --- Stylus Input Pipeline ---
+    function handlePointerDown(e) {
+      if (e.target.tagName !== 'CANVAS') return;
+      AppState.isDrawing = true;
+      const rect = viewport.getBoundingClientRect();
+      AppState.currentStroke = {
+        id: crypto.randomUUID(),
+        layerId: AppState.activeLayer,
+        color: AppState.activeLayer === 'L3_REDLINE' ? '#FF4B00' : '#1C1C1A',
+        width: AppState.activeLayer === 'L3_REDLINE' ? 3 : 2,
+        points: [{ x: e.clientX - rect.left, y: e.clientY - rect.top, pressure: e.pressure || 0.5 }]
+      };
+    }
+
+    function handlePointerMove(e) {
+      const rect = viewport.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      document.getElementById('pointerMetrics').innerText = `X: ${x.toFixed(0)} | Y: ${y.toFixed(0)} | P: ${(e.pressure || 0).toFixed(2)}`;
+
+      if (!AppState.isDrawing || !AppState.currentStroke) return;
+      AppState.currentStroke.points.push({ x, y, pressure: e.pressure || 0.5 });
+      renderStroke(AppState.activeLayer === 'L3_REDLINE' ? redlineCtx : drawCtx, AppState.currentStroke);
+    }
+
+    function handlePointerUp() {
+      if (!AppState.isDrawing) return;
+      AppState.isDrawing = false;
+      if (AppState.currentStroke?.points.length > 1) {
+        AppState.strokes.push(AppState.currentStroke);
+        saveEntry();
+      }
+      AppState.currentStroke = null;
+    }
+
+    viewport.addEventListener('pointerdown', handlePointerDown);
+    viewport.addEventListener('pointermove', handlePointerMove);
+    viewport.addEventListener('pointerup', handlePointerUp);
+
+    // --- Text Conversion ---
+    document.getElementById('convertOcrBtn').addEventListener('click', () => {
+      if (AppState.strokes.length === 0) return alert("No vector strokes present to recognize.");
+      let minX = Infinity, minY = Infinity;
+      AppState.strokes.forEach(s => s.points.forEach(p => { if (p.x < minX) minX = p.x; if (p.y < minY) minY = p.y; }));
+      
+      AppState.textNodes.push({
+        id: crypto.randomUUID(),
+        boundingBox: { x: Math.max(minX, 10), y: Math.max(minY - 20, 10) },
+        rawText: "REBAR SPACING VERIFIED @ 200MM",
+        timestamp: Date.now()
+      });
+      saveEntry();
+      renderTextNodes();
+    });
+
+    // --- Google Apps Script Serverless Cloud Bridge ---
+    async function syncToGoogleCloud() {
+      const status = document.getElementById('storageStatus');
+      if (GOOGLE_GAS_ENDPOINT.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
+        alert("Please set your deployed Google Apps Script Web App URL in the code.");
+        return;
+      }
+      status.innerText = "CLOUD: SYNCING...";
+      try {
+        const payload = {
+          isoDate: AppState.currentDate,
+          strokes: AppState.strokes,
+          textNodes: AppState.textNodes,
+          background: AppState.bgTransform
+        };
+        const res = await fetch(GOOGLE_GAS_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === "SUCCESS") {
+          status.innerText = "CLOUD: SYNC_OK";
+        } else {
+          throw new Error(data.message);
+        }
+      } catch (err) {
+        status.innerText = "CLOUD: SYNC_ERR";
+        console.error("Sync Error:", err);
+      }
+    }
+    document.getElementById('cloudSyncBtn').addEventListener('click', syncToGoogleCloud);
+
+    // Controls & Handlers
+    document.querySelectorAll('input[name="activeLayer"]').forEach(r => r.addEventListener('change', e => AppState.activeLayer = e.target.value));
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      AppState.strokes = AppState.strokes.filter(s => s.layerId !== AppState.activeLayer);
+      saveEntry();
+      redrawAllLayers();
+    });
+
+    document.getElementById('prevDateBtn').addEventListener('click', () => changeDate(-1));
+    document.getElementById('nextDateBtn').addEventListener('click', () => changeDate(1));
+    function changeDate(d) {
+      const date = new Date(AppState.currentDate);
+      date.setDate(date.getDate() + d);
+      AppState.currentDate = date.toISOString().split('T')[0];
+      document.getElementById('currentDateDisplay').innerText = AppState.currentDate.replace(/-/g, '.');
+      loadEntry(AppState.currentDate);
+    }
+
+    document.getElementById('importImgBtn').addEventListener('click', () => document.getElementById('imgFileInput').click());
+    document.getElementById('imgFileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        AppState.bgTransform = { base64Data: evt.target.result };
+        saveEntry();
+        redrawAllLayers();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(AppState.strokes, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ARCH_LOG_${AppState.currentDate}.json`;
+      a.click();
+    });
+
+    // Bootstrapping Engine
+    (async function init() {
+      await initDB();
+      resizeCanvases();
+      await loadEntry(AppState.currentDate);
+    })();
+  </script>
 </body>
 </html>
