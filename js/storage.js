@@ -1,18 +1,20 @@
 import { AppState } from './state.js';
 
-/**
- * Storage Engine: Handles IndexedDB Persistence & Serverless Cloud Sync
- */
 export async function initDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('ArchMultiCanvasAgendaDB', 2);
-    req.onupgradeneeded = (e) => e.target.result.createObjectStore('agenda_store', { keyPath: 'isoDate' });
+    const req = indexedDB.open('ArchMultiCanvasAgendaDB', 3);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('agenda_store')) {
+        db.createObjectStore('agenda_store', { keyPath: 'isoDate' });
+      }
+    };
     req.onsuccess = (e) => {
       AppState.db = e.target.result;
       document.getElementById('storageStatus').innerText = "STORAGE: IDB_ONLINE";
       resolve(AppState.db);
     };
-    req.onerror = (e) => reject(e);
+    req.onerror = reject;
   });
 }
 
@@ -43,7 +45,7 @@ export async function syncToGoogleCloud() {
   const endpoint = AppState.config?.googleAppsScriptEndpoint;
 
   if (!endpoint || endpoint.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-    alert("Please configure a valid Google Apps Script URL in config.json");
+    alert("Please set a valid Google Apps Script Web App URL in config.json");
     return;
   }
 
@@ -64,10 +66,10 @@ export async function syncToGoogleCloud() {
     if (data.status === "SUCCESS") {
       status.innerText = "CLOUD: SYNC_OK";
     } else {
-      throw new Error(data.message);
+      throw new Error(data.message || "Execution Error");
     }
   } catch (err) {
     status.innerText = "CLOUD: SYNC_ERR";
-    console.error("Cloud Sync Failure:", err);
+    console.error("Cloud Sync Exception:", err);
   }
 }
