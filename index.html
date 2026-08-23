@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ARCH_LOG // Daily Spatial Agenda</title>
   
-  <!-- Replace existing viewport/apple meta tags in index.html -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#F4F4F0">
 
   <link rel="stylesheet" href="css/main.css">
 </head>
@@ -36,8 +35,41 @@
       <div id="storageStatus">STORAGE: INITIALIZING...</div>
     </div>
 
-    <!-- Dynamic Scrollable Topic Workspace -->
+    <!-- Scrollable Hourly Time-Grid Viewport -->
     <main id="agendaViewport"></main>
+
+    <!-- FOCUSED CANVAS DRAFTING STUDIO (MODAL OVERLAY) -->
+    <div id="studioModal" class="modal-hidden">
+      <div id="studioHeader">
+        <div class="studio-title-group">
+          <div class="brand-accent"></div>
+          <h1 id="studioTopicTitle">#TOPIC_TITLE</h1>
+          <span id="studioTimeBadge" class="time-badge">09:00 - 10:00</span>
+        </div>
+        <button class="btn btn-orange" id="closeStudioBtn">[ CLOSE & SAVE ]</button>
+      </div>
+
+      <!-- Multi-Tab Navigation Bar -->
+      <div id="studioTabBar">
+        <div id="tabList"></div>
+        <button class="btn" id="addTabBtn">+ NEW CANVAS</button>
+      </div>
+
+      <!-- Drawing Toolbar Controls -->
+      <div id="studioToolbar">
+        <div class="action-group">
+          <button class="btn btn-orange" id="undoBtn">↶ UNDO</button>
+          <button class="btn" id="clearCanvasBtn">CLEAR SURFACE</button>
+          <button class="btn" id="removeCanvasBtn" style="color:#D32F2F; border-color:#D32F2F;">DELETE CANVAS</button>
+        </div>
+        <div id="studioSaveIndicator" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">
+          STATUS: READY
+        </div>
+      </div>
+
+      <!-- Active Drawing Area -->
+      <div id="studioCanvasViewport"></div>
+    </div>
 
     <footer>
       <span id="pointerMetrics">X: 0000 | Y: 0000 | P: 0.00</span>
@@ -45,7 +77,6 @@
     </footer>
   </div>
 
-  <!-- Module Entry Point -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
