@@ -161,7 +161,7 @@
 
     <div id="context-banner">
       <div><span class="tag">TOPIC: #SITE_A1</span><span class="tag">#ELEVATION</span></div>
-      <div id="storageStatus">STORAGE: IDB_ONLINE</div>
+      <div id="storageStatus">STORAGE: INITIALIZING...</div>
     </div>
 
     <div id="viewport">
@@ -183,14 +183,12 @@
 
     <footer>
       <span id="pointerMetrics">X: 0000 | Y: 0000 | P: 0.00</span>
-      <span>RUNTIME: GITHUB_PAGES_HOSTED</span>
+      <span id="configStatus">CONFIG: UNLOADED</span>
     </footer>
   </div>
 
   <script type="module">
-    // Configure your deployed Google Apps Script Endpoint URL here:
-    const GOOGLE_GAS_ENDPOINT = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
-
+    // --- Application State ---
     const AppState = {
       currentDate: new Date().toISOString().split('T')[0],
       activeLayer: 'L2_PENCIL',
@@ -199,7 +197,8 @@
       strokes: [],
       textNodes: [],
       bgTransform: null,
-      db: null
+      db: null,
+      config: null // Loaded dynamically from config.json
     };
 
     const viewport = document.getElementById('viewport');
@@ -211,13 +210,36 @@
     const drawCtx = drawCanvas.getContext('2d');
     const redlineCtx = redlineCanvas.getContext('2d');
 
+    // --- Configuration Loader Subsystem ---
+    async function loadConfiguration() {
+      const configStatus = document.getElementById('configStatus');
+      try {
+        const response = await fetch('./config.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to load config.json`);
+        
+        AppState.config = await response.json();
+        configStatus.innerText = `CONFIG: LOADED (${AppState.config.environment.toUpperCase()})`;
+      } catch (err) {
+        console.error("Configuration Loader Exception:", err);
+        configStatus.innerText = "CONFIG: LOAD_FAILED";
+        document.getElementById('storageStatus').innerText = "STORAGE: CONFIG_ERROR";
+      }
+    }
+
     // --- IndexedDB Local Persistence Engine ---
     async function initDB() {
       return new Promise((resolve, reject) => {
         const req = indexedDB.open('ArchLogbookDB', 1);
         req.onupgradeneeded = (e) => e.target.result.createObjectStore('entries', { keyPath: 'isoDate' });
-        req.onsuccess = (e) => { AppState.db = e.target.result; resolve(AppState.db); };
-        req.onerror = reject;
+        req.onsuccess = (e) => { 
+          AppState.db = e.target.result; 
+          document.getElementById('storageStatus').innerText = "STORAGE: IDB_ONLINE";
+          resolve(AppState.db); 
+        };
+        req.onerror = (e) => {
+          document.getElementById('storageStatus').innerText = "STORAGE: IDB_ERROR";
+          reject(e);
+        };
       });
     }
 
@@ -361,13 +383,21 @@
       renderTextNodes();
     });
 
-    // --- Google Apps Script Serverless Cloud Bridge ---
+    // --- Serverless Cloud Bridge via Dynamic Config Endpoint ---
     async function syncToGoogleCloud() {
       const status = document.getElementById('storageStatus');
-      if (GOOGLE_GAS_ENDPOINT.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-        alert("Please set your deployed Google Apps Script Web App URL in the code.");
+      
+      if (!AppState.config || !AppState.config.googleAppsScriptEndpoint) {
+        alert("Configuration error: config.json is missing or unreadable.");
         return;
       }
+
+      const endpoint = AppState.config.googleAppsScriptEndpoint;
+      if (endpoint.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
+        alert("Please paste your valid Google Apps Script Web App URL into config.json.");
+        return;
+      }
+
       status.innerText = "CLOUD: SYNCING...";
       try {
         const payload = {
@@ -376,25 +406,27 @@
           textNodes: AppState.textNodes,
           background: AppState.bgTransform
         };
-        const res = await fetch(GOOGLE_GAS_ENDPOINT, {
+
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
+
         const data = await res.json();
         if (data.status === "SUCCESS") {
           status.innerText = "CLOUD: SYNC_OK";
         } else {
-          throw new Error(data.message);
+          throw new Error(data.message || "Cloud execution error");
         }
       } catch (err) {
         status.innerText = "CLOUD: SYNC_ERR";
-        console.error("Sync Error:", err);
+        console.error("Cloud Sync Exception:", err);
       }
     }
     document.getElementById('cloudSyncBtn').addEventListener('click', syncToGoogleCloud);
 
-    // Controls & Handlers
+    // --- UI Event Listeners ---
     document.querySelectorAll('input[name="activeLayer"]').forEach(r => r.addEventListener('change', e => AppState.activeLayer = e.target.value));
     document.getElementById('clearBtn').addEventListener('click', () => {
       AppState.strokes = AppState.strokes.filter(s => s.layerId !== AppState.activeLayer);
@@ -433,8 +465,9 @@
       a.click();
     });
 
-    // Bootstrapping Engine
-    (async function init() {
+    // --- Sequential Boot Sequence ---
+    (async function boot() {
+      await loadConfiguration();
       await initDB();
       resizeCanvases();
       await loadEntry(AppState.currentDate);
