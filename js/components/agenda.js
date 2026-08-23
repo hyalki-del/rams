@@ -49,21 +49,22 @@ export function renderAgendaView() {
 
     card.innerHTML = `
       <div class="drag-header">
-        <input type="text" class="topic-title" value="${topic.title}">
+        <input type="text" class="topic-title-input" value="${topic.title}">
         <span class="time-badge">${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}</span>
-        <button class="btn btn-orange edit-topic-btn">[ EDIT / DRAW ]</button>
-        <button class="btn remove-topic-btn">X</button>
+        <div class="action-group">
+          <button class="btn btn-orange edit-topic-btn">[ EDIT / DRAW ]</button>
+          <button class="btn remove-topic-btn">X</button>
+        </div>
       </div>
       <div class="resize-handle-bottom"></div>
     `;
 
-    // Bind Edit/Draw Studio Trigger
     card.querySelector('.edit-topic-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       studioModalInstance.open(topic);
     });
 
-    card.querySelector('.topic-title').addEventListener('change', (e) => {
+    card.querySelector('.topic-title-input').addEventListener('change', (e) => {
       topic.title = e.target.value;
       saveCurrentDateState();
       renderAgendaView();
