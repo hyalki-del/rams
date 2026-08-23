@@ -4,5 +4,5 @@
   "environment": "production",
   "version": "2.0.0",
   "googleAppsScriptEndpoint": "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec",
-  "defaultTopics": ["#SITE_INSPECTION", "#ELEVATION_REDLINE"]
+
 }
