@@ -1,5 +1,10 @@
 {
-  "GAS_ENDPOINT": "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec",
-  "APP_TITLE": "ARCH.VECTOR // SYSTEM",
-  "GRID_SIZE": 20
+  "application": "ARCH_LOG",
+  "environment": "production",
+  "version": "1.0.0",
+  "googleAppsScriptEndpoint": "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec",
+  "syncSettings": {
+    "autoSyncOnDateChange": false,
+    "timeoutMs": 10000
+  }
 }
