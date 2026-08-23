@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>ARCH_LOG // Daily Spatial Agenda</title>
-  
+
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#F4F4F0">
@@ -14,8 +14,12 @@
 <body>
 
   <div id="app-container">
+    <!-- Header Controls -->
     <header>
-      <div class="brand"><div class="brand-accent"></div><span>ARCH_LOG // AGENDA</span></div>
+      <div class="brand">
+        <div class="brand-accent"></div>
+        <span>ARCH_LOG // AGENDA</span>
+      </div>
       
       <div class="date-shuffler">
         <button class="btn" id="prevDateBtn">[◄ PREV]</button>
@@ -30,9 +34,10 @@
       </div>
     </header>
 
+    <!-- Context & Tags Banner -->
     <div id="context-banner">
       <div id="activeTagsContainer"></div>
-      <div id="storageStatus">STORAGE: INITIALIZING...</div>
+      <div id="storageStatus">STORAGE: IDB_ONLINE</div>
     </div>
 
     <!-- Scrollable Hourly Time-Grid Viewport -->
@@ -62,18 +67,17 @@
           <button class="btn" id="clearCanvasBtn">CLEAR SURFACE</button>
           <button class="btn" id="removeCanvasBtn" style="color:#D32F2F; border-color:#D32F2F;">DELETE CANVAS</button>
         </div>
-        <div id="studioSaveIndicator" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);">
-          STATUS: READY
-        </div>
+        <div id="studioSaveIndicator">STATUS: READY</div>
       </div>
 
       <!-- Active Drawing Area -->
       <div id="studioCanvasViewport"></div>
     </div>
 
+    <!-- System Footer -->
     <footer>
       <span id="pointerMetrics">X: 0000 | Y: 0000 | P: 0.00</span>
-      <span id="configStatus">CONFIG: UNLOADED</span>
+      <span id="configStatus">CONFIG: LOADED</span>
     </footer>
   </div>
 
