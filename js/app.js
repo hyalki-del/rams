@@ -2,9 +2,6 @@ import { AppState } from './state.js';
 import { initDB, loadDateState, syncToGoogleCloud } from './storage.js';
 import { renderAgendaView, createNewTopic } from './components/agenda.js';
 
-/**
- * Main Application Bootstrapper
- */
 async function loadConfig() {
   try {
     const res = await fetch('./config.json', { cache: 'no-store' });
