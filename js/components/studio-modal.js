@@ -29,11 +29,9 @@ export class StudioModal {
     this.activeTopic = topic;
     this.activeCanvasIndex = 0;
 
-    // Render prominent title in big letters
     this.titleEl.innerText = topic.title;
     this.timeBadgeEl.innerText = `${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}`;
 
-    // Ensure topic has at least one canvas tab
     if (!topic.canvases || topic.canvases.length === 0) {
       topic.canvases = [{ id: crypto.randomUUID(), strokes: [] }];
     }
@@ -88,11 +86,11 @@ export class StudioModal {
 
   removeActiveCanvasTab() {
     if (this.activeTopic.canvases.length <= 1) {
-      alert("A topic must retain at least one canvas.");
+      alert("A topic must retain at least one canvas tab.");
       return;
     }
 
-    if (confirm("Are you sure you want to delete this canvas tab?")) {
+    if (confirm("Delete this canvas tab?")) {
       this.activeTopic.canvases.splice(this.activeCanvasIndex, 1);
       this.activeCanvasIndex = Math.max(0, this.activeCanvasIndex - 1);
       saveCurrentDateState();
