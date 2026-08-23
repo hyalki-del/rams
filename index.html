@@ -23,30 +23,30 @@
       --signal-orange: #FF4B00;
       --font-mono: 'SF Mono', 'Courier New', Courier, monospace;
       --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
-      
+
       --safe-top: env(safe-area-inset-top, 20px);
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-left: env(safe-area-inset-left, 0px);
       --safe-right: env(safe-area-inset-right, 0px);
     }
 
-    * { 
-      box-sizing: border-box; 
-      margin: 0; 
-      padding: 0; 
-      -webkit-user-select: none; 
-      user-select: none; 
-      touch-action: none; 
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: none;
     }
 
-    body, html { 
-      width: 100%; 
-      height: 100dvh; 
-      overflow: hidden; 
-      background: var(--bg-paper); 
-      color: var(--text-main); 
-      font-family: var(--font-sans); 
-      font-size: 13px; 
+    body, html {
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: var(--bg-paper);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 13px;
     }
 
     #app-container {
@@ -162,8 +162,6 @@
 
     .topic-card-scheduled {
       position: absolute;
-      left: 12px;
-      right: 12px;
       background: var(--bg-paper);
       border: 1px solid var(--border-dark);
       border-left: 4px solid var(--signal-orange);
@@ -173,6 +171,13 @@
       overflow: hidden;
       z-index: 10;
       touch-action: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .topic-card-scheduled.dragging {
+      z-index: 50;
+      border-color: var(--signal-orange);
+      box-shadow: 0px 4px 12px rgba(255, 75, 0, 0.25);
     }
 
     .drag-header {
@@ -194,12 +199,15 @@
       font-size: 12px;
       color: var(--text-main);
       outline: none;
+      width: 100%;
+      max-width: 120px;
     }
 
     .time-badge {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
+      white-space: nowrap;
     }
 
     .resize-handle-bottom {
@@ -333,7 +341,7 @@
         <div class="brand-accent"></div>
         <span>ARCH_LOG // AGENDA</span>
       </div>
-      
+
       <div class="date-shuffler">
         <button class="btn" id="prevDateBtn">[◄ PREV]</button>
         <span id="currentDateDisplay">2026.08.23</span>
@@ -392,8 +400,7 @@
     // --- Application State ---
     const AppState = {
       currentDate: new Date().toISOString().split('T')[0],
-      googleAppsScriptEndpoint: "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec", // Insert Apps Script URL here if cloud sync is needed  "googleAppsScriptEndpoint": "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec",
-
+      googleAppsScriptEndpoint: "https://script.google.com/macros/s/AKfycbzaU_6U9lV9cOVPC28h2vV2EyOWdrgwDNJXMklV6qSue2Nmv2SM7c4HeCMRu0ZcIkrwaQ/exec",
       db: null,
       agenda: {}
     };
@@ -498,7 +505,7 @@
       onPointerMove(e) {
         if (!this.isDrawing || !this.currentStroke) return;
         const rect = this.canvas.getBoundingClientRect();
-        
+
         const metrics = document.getElementById('pointerMetrics');
         if (metrics) {
           metrics.innerText = `X: ${(e.clientX - rect.left).toFixed(0)} | Y: ${(e.clientY - rect.top).toFixed(0)} | P: ${(e.pressure || 0).toFixed(2)}`;
@@ -688,6 +695,68 @@
       }
     }
 
+    // --- Overlapping Column Compute Engine ---
+    function calculateOverlappingColumns(topics) {
+      if (!topics || topics.length === 0) return [];
+
+      // Sort topics by start hour, then duration
+      const sorted = topics.map(t => ({ ...t })).sort((a, b) => {
+        if (a.startHour !== b.startHour) return a.startHour - b.startHour;
+        return b.durationHours - a.durationHours;
+      });
+
+      const clusters = [];
+      let currentCluster = [];
+      let clusterEnd = -1;
+
+      // Group overlapping topics into connected components (clusters)
+      sorted.forEach(t => {
+        const endHour = t.startHour + t.durationHours;
+        if (t.startHour < clusterEnd) {
+          currentCluster.push(t);
+          clusterEnd = Math.max(clusterEnd, endHour);
+        } else {
+          if (currentCluster.length > 0) clusters.push(currentCluster);
+          currentCluster = [t];
+          clusterEnd = endHour;
+        }
+      });
+      if (currentCluster.length > 0) clusters.push(currentCluster);
+
+      // Pack columns within each cluster
+      const computedLayout = [];
+      clusters.forEach(cluster => {
+        const columns = [];
+        cluster.forEach(topic => {
+          let placed = false;
+          for (let i = 0; i < columns.length; i++) {
+            const lastInCol = columns[i][columns[i].length - 1];
+            if (lastInCol.startHour + lastInCol.durationHours <= topic.startHour) {
+              columns[i].push(topic);
+              topic.columnIndex = i;
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) {
+            topic.columnIndex = columns.length;
+            columns.push([topic]);
+          }
+        });
+
+        const totalCols = columns.length;
+        cluster.forEach(topic => {
+          computedLayout.push({
+            id: topic.id,
+            columnIndex: topic.columnIndex,
+            totalColumns: totalCols
+          });
+        });
+      });
+
+      return computedLayout;
+    }
+
     // --- Agenda Schedule Controller ---
     const HOUR_HEIGHT = 60;
     let studioModalInstance = null;
@@ -703,6 +772,7 @@
       tagsContainer.innerHTML = '';
 
       const topics = getCurrentAgenda();
+      const layoutMap = new Map(calculateOverlappingColumns(topics).map(item => [item.id, item]));
 
       const scheduleContainer = document.createElement('div');
       scheduleContainer.id = 'scheduleContainer';
@@ -733,6 +803,14 @@
         card.className = 'topic-card-scheduled';
         card.style.top = `${topic.startHour * HOUR_HEIGHT}px`;
         card.style.height = `${Math.max(topic.durationHours * HOUR_HEIGHT, 60)}px`;
+
+        // Apply overlapping frame metrics
+        const layout = layoutMap.get(topic.id) || { columnIndex: 0, totalColumns: 1 };
+        const colWidthPercent = 100 / layout.totalColumns;
+        const leftOffsetPercent = layout.columnIndex * colWidthPercent;
+
+        card.style.width = `calc(${colWidthPercent}% - 8px)`;
+        card.style.left = `calc(${leftOffsetPercent}% + 4px)`;
 
         card.innerHTML = `
           <div class="drag-header">
@@ -781,34 +859,63 @@
       let startY = 0;
       let initialStartHour = 0;
       let initialDuration = 0;
+      let longPressTimer = null;
 
+      // 1000ms Delay Drag Pointer Handler
       header.addEventListener('pointerdown', (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
-        isDragging = true;
+        
+        const pointerId = e.pointerId;
         startY = e.clientY;
         initialStartHour = topic.startHour;
-        header.setPointerCapture(e.pointerId);
+
+        longPressTimer = setTimeout(() => {
+          isDragging = true;
+          card.classList.add('dragging');
+          header.setPointerCapture(pointerId);
+        }, 1000);
       });
 
       header.addEventListener('pointermove', (e) => {
-        if (!isDragging) return;
+        if (!isDragging) {
+          // Cancel timer if finger moves > 5px before 1000ms threshold
+          if (longPressTimer && Math.abs(e.clientY - startY) > 5) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
+          return;
+        }
+
         const deltaHours = (e.clientY - startY) / HOUR_HEIGHT;
         let newStartHour = Math.round((initialStartHour + deltaHours) * 4) / 4;
         newStartHour = Math.max(0, Math.min(23.75, newStartHour));
 
         topic.startHour = newStartHour;
         card.style.top = `${newStartHour * HOUR_HEIGHT}px`;
-        card.querySelector('.time-badge').innerText = 
+        card.querySelector('.time-badge').innerText =
           `${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}`;
-      });
 
-      header.addEventListener('pointerup', () => {
-        if (!isDragging) return;
-        isDragging = false;
-        saveCurrentDateState();
+        // Dynamic re-render during drag for instant grid response
         renderAgendaView();
       });
 
+      const cancelOrEndDrag = () => {
+        if (longPressTimer) {
+          clearTimeout(longPressTimer);
+          longPressTimer = null;
+        }
+        if (isDragging) {
+          isDragging = false;
+          card.classList.remove('dragging');
+          saveCurrentDateState();
+          renderAgendaView();
+        }
+      };
+
+      header.addEventListener('pointerup', cancelOrEndDrag);
+      header.addEventListener('pointercancel', cancelOrEndDrag);
+
+      // Resizing logic
       resizeHandle.addEventListener('pointerdown', (e) => {
         isResizing = true;
         startY = e.clientY;
@@ -825,8 +932,10 @@
 
         topic.durationHours = newDuration;
         card.style.height = `${newDuration * HOUR_HEIGHT}px`;
-        card.querySelector('.time-badge').innerText = 
+        card.querySelector('.time-badge').innerText =
           `${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}`;
+        
+        renderAgendaView();
       });
 
       resizeHandle.addEventListener('pointerup', () => {
@@ -876,7 +985,7 @@
       const date = new Date(AppState.currentDate);
       date.setDate(date.getDate() + deltaDays);
       AppState.currentDate = date.toISOString().split('T')[0];
-      
+
       document.getElementById('currentDateDisplay').innerText = AppState.currentDate.replace(/-/g, '.');
       await loadDateState(AppState.currentDate);
       renderAgendaView();
