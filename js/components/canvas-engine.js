@@ -1,13 +1,10 @@
 import { saveCurrentDateState } from '../storage.js';
 
-/**
- * Vector Canvas Engine with Stack History (Undo Engine)
- */
 export class CanvasInstance {
   constructor(container, canvasData, onUpdate) {
     this.container = container;
-    this.data = canvasData; // { id, strokes: [] }
-    this.onUpdate = onUpdate; // Callback notification trigger
+    this.data = canvasData;
+    this.onUpdate = onUpdate;
     this.isDrawing = false;
     this.currentStroke = null;
 
@@ -54,6 +51,13 @@ export class CanvasInstance {
   onPointerMove(e) {
     if (!this.isDrawing || !this.currentStroke) return;
     const rect = this.canvas.getBoundingClientRect();
+    
+    // Update live metrics on bottom bar
+    const metrics = document.getElementById('pointerMetrics');
+    if (metrics) {
+      metrics.innerText = `X: ${(e.clientX - rect.left).toFixed(0)} | Y: ${(e.clientY - rect.top).toFixed(0)} | P: ${(e.pressure || 0).toFixed(2)}`;
+    }
+
     this.currentStroke.points.push({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
@@ -67,7 +71,6 @@ export class CanvasInstance {
     if (!this.isDrawing) return;
     this.isDrawing = false;
     if (this.currentStroke?.points.length > 1) {
-      // Commit stroke to local data array (Command Stack Push)
       this.data.strokes.push(this.currentStroke);
       saveCurrentDateState();
       if (this.onUpdate) this.onUpdate();
@@ -75,21 +78,15 @@ export class CanvasInstance {
     this.currentStroke = null;
   }
 
-  /**
-   * Undo Engine Operation: Removes top vector stroke from command stack
-   */
   undo() {
     if (this.data.strokes.length === 0) return false;
-    this.data.strokes.pop(); // Pop top command
+    this.data.strokes.pop();
     saveCurrentDateState();
     this.redraw();
     if (this.onUpdate) this.onUpdate();
     return true;
   }
 
-  /**
-   * Clears all strokes on current canvas
-   */
   clear() {
     this.data.strokes = [];
     saveCurrentDateState();
