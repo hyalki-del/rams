@@ -9,12 +9,325 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#F4F4F0">
 
-  <link rel="stylesheet" href="css/main.css">
+  <style>
+    /* ==========================================================================
+       Dieter Rams Visual System (Neutral Paper, Single-Pixel Dividers, Signal Orange)
+       ========================================================================== */
+    :root {
+      --bg-paper: #F4F4F0;
+      --panel-bg: #EAEAE5;
+      --border-color: #D1D1CD;
+      --border-dark: #1C1C1A;
+      --text-main: #1C1C1A;
+      --text-muted: #7A7A75;
+      --signal-orange: #FF4B00;
+      --font-mono: 'SF Mono', 'Courier New', Courier, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      
+      --safe-top: env(safe-area-inset-top, 20px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+    }
+
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+      -webkit-user-select: none; 
+      user-select: none; 
+      touch-action: none; 
+    }
+
+    body, html { 
+      width: 100%; 
+      height: 100dvh; 
+      overflow: hidden; 
+      background: var(--bg-paper); 
+      color: var(--text-main); 
+      font-family: var(--font-sans); 
+      font-size: 13px; 
+    }
+
+    #app-container {
+      display: grid;
+      grid-template-rows: calc(48px + var(--safe-top)) 32px 1fr calc(24px + var(--safe-bottom));
+      width: 100vw;
+      height: 100dvh;
+      border: 1px solid var(--border-dark);
+    }
+
+    header {
+      grid-row: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: var(--safe-top);
+      padding-left: calc(16px + var(--safe-left));
+      padding-right: calc(16px + var(--safe-right));
+      background: var(--bg-paper);
+      border-bottom: 1px solid var(--border-dark);
+      font-family: var(--font-mono);
+      z-index: 100;
+    }
+
+    .brand { font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+    .brand-accent { width: 8px; height: 8px; background: var(--signal-orange); }
+
+    .date-shuffler {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 4px 8px;
+    }
+
+    .action-group { display: flex; gap: 6px; }
+
+    .btn {
+      background: transparent;
+      border: 1px solid var(--border-dark);
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 4px 8px;
+      min-height: 28px;
+    }
+    .btn:active { background: var(--text-main); color: var(--bg-paper); }
+    .btn-orange { background: var(--signal-orange); color: #FFFFFF; border: none; }
+
+    #context-banner {
+      grid-row: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: calc(16px + var(--safe-left));
+      padding-right: calc(16px + var(--safe-right));
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .tag { color: var(--text-main); background: var(--bg-paper); padding: 2px 6px; border: 1px solid var(--border-color); margin-right: 4px; }
+
+    #agendaViewport {
+      grid-row: 3;
+      overflow-y: auto;
+      padding: 16px;
+      padding-left: calc(16px + var(--safe-left));
+      padding-right: calc(16px + var(--safe-right));
+      display: flex;
+      flex-direction: column;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Hourly Grid Layout */
+    #scheduleContainer {
+      position: relative;
+      display: flex;
+      width: 100%;
+      min-height: 1440px;
+      background: var(--bg-paper);
+      border: 1px solid var(--border-color);
+    }
+
+    #timeLegend {
+      width: 60px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--border-dark);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      background: var(--panel-bg);
+    }
+
+    .time-row-label {
+      height: 60px;
+      padding: 4px;
+      border-bottom: 1px dashed var(--border-color);
+      box-sizing: border-box;
+    }
+
+    #timeGridBody {
+      position: relative;
+      flex-grow: 1;
+      background-size: 100% 60px;
+      background-image: linear-gradient(to bottom, var(--border-color) 1px, transparent 1px);
+    }
+
+    .topic-card-scheduled {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      background: var(--bg-paper);
+      border: 1px solid var(--border-dark);
+      border-left: 4px solid var(--signal-orange);
+      box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 10;
+      touch-action: none;
+    }
+
+    .drag-header {
+      background: var(--panel-bg);
+      padding: 6px 10px;
+      cursor: grab;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+    }
+
+    .topic-title-input {
+      border: none;
+      background: transparent;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    .time-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .resize-handle-bottom {
+      height: 10px;
+      width: 100%;
+      background: var(--border-color);
+      cursor: ns-resize;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+    }
+
+    /* Focused Studio Modal Overlay */
+    .modal-hidden { display: none !important; }
+
+    #studioModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100dvh;
+      background: var(--bg-paper);
+      z-index: 500;
+      display: grid;
+      grid-template-rows: calc(52px + var(--safe-top)) 36px 40px 1fr;
+      padding-top: var(--safe-top);
+      box-sizing: border-box;
+    }
+
+    #studioHeader {
+      grid-row: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: var(--bg-paper);
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    .studio-title-group { display: flex; align-items: center; gap: 12px; }
+
+    #studioTopicTitle {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text-main);
+    }
+
+    #studioTabBar {
+      grid-row: 2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
+      background: var(--panel-bg);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    #tabList { display: flex; gap: 4px; }
+
+    .tab-btn {
+      background: var(--bg-paper);
+      border: 1px solid var(--border-color);
+      border-bottom: none;
+      padding: 4px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: var(--text-main);
+      color: var(--bg-paper);
+      font-weight: 700;
+    }
+
+    #studioToolbar {
+      grid-row: 3;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: var(--bg-paper);
+      border-bottom: 1px solid var(--border-color);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    #studioSaveIndicator { color: var(--text-muted); }
+
+    #studioCanvasViewport {
+      grid-row: 4;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background-image: radial-gradient(circle, #D1D1CD 1px, transparent 1px);
+      background-size: 20px 20px;
+      overflow: hidden;
+    }
+
+    #studioCanvasViewport canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    footer {
+      grid-row: 4;
+      background: var(--panel-bg);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: var(--safe-bottom);
+      padding-left: calc(16px + var(--safe-left));
+      padding-right: calc(16px + var(--safe-right));
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+  </style>
 </head>
 <body>
 
   <div id="app-container">
-    <!-- Header Controls -->
     <header>
       <div class="brand">
         <div class="brand-accent"></div>
@@ -34,16 +347,14 @@
       </div>
     </header>
 
-    <!-- Context & Tags Banner -->
     <div id="context-banner">
       <div id="activeTagsContainer"></div>
       <div id="storageStatus">STORAGE: IDB_ONLINE</div>
     </div>
 
-    <!-- Scrollable Hourly Time-Grid Viewport -->
     <main id="agendaViewport"></main>
 
-    <!-- FOCUSED CANVAS DRAFTING STUDIO (MODAL OVERLAY) -->
+    <!-- FOCUSED CANVAS STUDIO MODAL OVERLAY -->
     <div id="studioModal" class="modal-hidden">
       <div id="studioHeader">
         <div class="studio-title-group">
@@ -54,13 +365,11 @@
         <button class="btn btn-orange" id="closeStudioBtn">[ CLOSE & SAVE ]</button>
       </div>
 
-      <!-- Multi-Tab Navigation Bar -->
       <div id="studioTabBar">
         <div id="tabList"></div>
         <button class="btn" id="addTabBtn">+ NEW CANVAS</button>
       </div>
 
-      <!-- Drawing Toolbar Controls -->
       <div id="studioToolbar">
         <div class="action-group">
           <button class="btn btn-orange" id="undoBtn">↶ UNDO</button>
@@ -70,17 +379,514 @@
         <div id="studioSaveIndicator">STATUS: READY</div>
       </div>
 
-      <!-- Active Drawing Area -->
       <div id="studioCanvasViewport"></div>
     </div>
 
-    <!-- System Footer -->
     <footer>
       <span id="pointerMetrics">X: 0000 | Y: 0000 | P: 0.00</span>
-      <span id="configStatus">CONFIG: LOADED</span>
+      <span id="configStatus">SYSTEM: EMBEDDED_STANDALONE</span>
     </footer>
   </div>
 
-  <script type="module" src="js/app.js"></script>
+  <script>
+    // --- Application State ---
+    const AppState = {
+      currentDate: new Date().toISOString().split('T')[0],
+      googleAppsScriptEndpoint: "", // Insert Apps Script URL here if cloud sync is needed
+      db: null,
+      agenda: {}
+    };
+
+    function getCurrentAgenda() {
+      if (!AppState.agenda[AppState.currentDate]) {
+        AppState.agenda[AppState.currentDate] = [];
+      }
+      return AppState.agenda[AppState.currentDate];
+    }
+
+    // --- IndexedDB Local Storage Layer ---
+    async function initDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open('ArchStandaloneAgendaDB', 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('agenda_store')) {
+            db.createObjectStore('agenda_store', { keyPath: 'isoDate' });
+          }
+        };
+        req.onsuccess = (e) => {
+          AppState.db = e.target.result;
+          document.getElementById('storageStatus').innerText = "STORAGE: IDB_ONLINE";
+          resolve(AppState.db);
+        };
+        req.onerror = reject;
+      });
+    }
+
+    async function saveCurrentDateState() {
+      if (!AppState.db) return;
+      const tx = AppState.db.transaction('agenda_store', 'readwrite');
+      tx.objectStore('agenda_store').put({
+        isoDate: AppState.currentDate,
+        updatedAt: Date.now(),
+        topics: AppState.agenda[AppState.currentDate] || []
+      });
+    }
+
+    async function loadDateState(isoDate) {
+      if (!AppState.db) return;
+      return new Promise((resolve) => {
+        const tx = AppState.db.transaction('agenda_store', 'readonly');
+        const req = tx.objectStore('agenda_store').get(isoDate);
+        req.onsuccess = () => {
+          AppState.agenda[isoDate] = req.result ? req.result.topics : [];
+          resolve(AppState.agenda[isoDate]);
+        };
+      });
+    }
+
+    // --- Vector Canvas Drawing Engine (Undo Command Stack) ---
+    class CanvasInstance {
+      constructor(container, canvasData, onUpdate) {
+        this.container = container;
+        this.data = canvasData;
+        this.onUpdate = onUpdate;
+        this.isDrawing = false;
+        this.currentStroke = null;
+
+        this.initDOM();
+        this.bindEvents();
+        this.redraw();
+      }
+
+      initDOM() {
+        this.container.innerHTML = '';
+        this.canvas = document.createElement('canvas');
+        this.container.appendChild(this.canvas);
+        this.ctx = this.canvas.getContext('2d');
+
+        this.resize();
+        new ResizeObserver(() => this.resize()).observe(this.container);
+      }
+
+      resize() {
+        const rect = this.container.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
+        this.redraw();
+      }
+
+      bindEvents() {
+        this.canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+        this.canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
+        this.canvas.addEventListener('pointerup', () => this.onPointerUp());
+      }
+
+      onPointerDown(e) {
+        this.isDrawing = true;
+        const rect = this.canvas.getBoundingClientRect();
+        this.currentStroke = {
+          id: crypto.randomUUID(),
+          color: '#1C1C1A',
+          width: 2,
+          points: [{ x: e.clientX - rect.left, y: e.clientY - rect.top, pressure: e.pressure || 0.5 }]
+        };
+      }
+
+      onPointerMove(e) {
+        if (!this.isDrawing || !this.currentStroke) return;
+        const rect = this.canvas.getBoundingClientRect();
+        
+        const metrics = document.getElementById('pointerMetrics');
+        if (metrics) {
+          metrics.innerText = `X: ${(e.clientX - rect.left).toFixed(0)} | Y: ${(e.clientY - rect.top).toFixed(0)} | P: ${(e.pressure || 0).toFixed(2)}`;
+        }
+
+        this.currentStroke.points.push({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+          pressure: e.pressure || 0.5
+        });
+
+        this.renderStroke(this.currentStroke);
+      }
+
+      onPointerUp() {
+        if (!this.isDrawing) return;
+        this.isDrawing = false;
+        if (this.currentStroke?.points.length > 1) {
+          this.data.strokes.push(this.currentStroke);
+          saveCurrentDateState();
+          if (this.onUpdate) this.onUpdate();
+        }
+        this.currentStroke = null;
+      }
+
+      undo() {
+        if (this.data.strokes.length === 0) return false;
+        this.data.strokes.pop();
+        saveCurrentDateState();
+        this.redraw();
+        if (this.onUpdate) this.onUpdate();
+        return true;
+      }
+
+      clear() {
+        this.data.strokes = [];
+        saveCurrentDateState();
+        this.redraw();
+        if (this.onUpdate) this.onUpdate();
+      }
+
+      renderStroke(stroke) {
+        if (!stroke.points || stroke.points.length < 2) return;
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.strokeStyle = stroke.color;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+
+        for (let i = 1; i < stroke.points.length - 1; i++) {
+          const midX = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
+          const midY = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
+          ctx.lineWidth = (stroke.points[i].pressure || 0.5) * stroke.width * 2;
+          ctx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, midX, midY);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(midX, midY);
+        }
+        ctx.restore();
+      }
+
+      redraw() {
+        if (!this.ctx) return;
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.data.strokes.forEach(s => this.renderStroke(s));
+      }
+    }
+
+    // --- Studio Modal Component Controller ---
+    class StudioModal {
+      constructor() {
+        this.modal = document.getElementById('studioModal');
+        this.titleEl = document.getElementById('studioTopicTitle');
+        this.timeBadgeEl = document.getElementById('studioTimeBadge');
+        this.tabListEl = document.getElementById('tabList');
+        this.viewportEl = document.getElementById('studioCanvasViewport');
+        this.saveIndicator = document.getElementById('studioSaveIndicator');
+
+        this.activeTopic = null;
+        this.activeCanvasIndex = 0;
+        this.currentCanvasEngine = null;
+
+        this.bindEvents();
+      }
+
+      bindEvents() {
+        document.getElementById('closeStudioBtn').addEventListener('click', () => this.close());
+        document.getElementById('addTabBtn').addEventListener('click', () => this.addNewCanvasTab());
+        document.getElementById('undoBtn').addEventListener('click', () => this.undoActiveCanvas());
+        document.getElementById('clearCanvasBtn').addEventListener('click', () => this.clearActiveCanvas());
+        document.getElementById('removeCanvasBtn').addEventListener('click', () => this.removeActiveCanvasTab());
+      }
+
+      open(topic) {
+        this.activeTopic = topic;
+        this.activeCanvasIndex = 0;
+
+        this.titleEl.innerText = topic.title;
+        this.timeBadgeEl.innerText = `${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}`;
+
+        if (!topic.canvases || topic.canvases.length === 0) {
+          topic.canvases = [{ id: crypto.randomUUID(), strokes: [] }];
+        }
+
+        this.modal.classList.remove('modal-hidden');
+        this.renderTabs();
+        this.mountActiveCanvas();
+      }
+
+      close() {
+        this.modal.classList.add('modal-hidden');
+        this.activeTopic = null;
+        this.currentCanvasEngine = null;
+        this.viewportEl.innerHTML = '';
+      }
+
+      renderTabs() {
+        this.tabListEl.innerHTML = '';
+        this.activeTopic.canvases.forEach((canvas, index) => {
+          const tabBtn = document.createElement('button');
+          tabBtn.className = `tab-btn ${index === this.activeCanvasIndex ? 'active' : ''}`;
+          tabBtn.innerText = `CANVAS 0${index + 1}`;
+          tabBtn.addEventListener('click', () => {
+            this.activeCanvasIndex = index;
+            this.renderTabs();
+            this.mountActiveCanvas();
+          });
+          this.tabListEl.appendChild(tabBtn);
+        });
+      }
+
+      mountActiveCanvas() {
+        const canvasData = this.activeTopic.canvases[this.activeCanvasIndex];
+        if (!canvasData) return;
+
+        this.currentCanvasEngine = new CanvasInstance(
+          this.viewportEl,
+          canvasData,
+          () => this.notifySaved()
+        );
+      }
+
+      addNewCanvasTab() {
+        const newCanvas = { id: crypto.randomUUID(), strokes: [] };
+        this.activeTopic.canvases.push(newCanvas);
+        this.activeCanvasIndex = this.activeTopic.canvases.length - 1;
+        saveCurrentDateState();
+        this.renderTabs();
+        this.mountActiveCanvas();
+        this.notifySaved();
+      }
+
+      removeActiveCanvasTab() {
+        if (this.activeTopic.canvases.length <= 1) {
+          alert("A topic must retain at least one canvas tab.");
+          return;
+        }
+
+        if (confirm("Delete this canvas tab?")) {
+          this.activeTopic.canvases.splice(this.activeCanvasIndex, 1);
+          this.activeCanvasIndex = Math.max(0, this.activeCanvasIndex - 1);
+          saveCurrentDateState();
+          this.renderTabs();
+          this.mountActiveCanvas();
+          this.notifySaved();
+        }
+      }
+
+      undoActiveCanvas() {
+        if (this.currentCanvasEngine) {
+          const undone = this.currentCanvasEngine.undo();
+          if (undone) this.notifySaved();
+        }
+      }
+
+      clearActiveCanvas() {
+        if (this.currentCanvasEngine && confirm("Clear all strokes on this canvas?")) {
+          this.currentCanvasEngine.clear();
+          this.notifySaved();
+        }
+      }
+
+      notifySaved() {
+        this.saveIndicator.innerText = `STATUS: AUTO_SAVED (${new Date().toLocaleTimeString()})`;
+      }
+    }
+
+    // --- Agenda Schedule Controller ---
+    const HOUR_HEIGHT = 60;
+    let studioModalInstance = null;
+
+    function renderAgendaView() {
+      if (!studioModalInstance) {
+        studioModalInstance = new StudioModal();
+      }
+
+      const viewport = document.getElementById('agendaViewport');
+      const tagsContainer = document.getElementById('activeTagsContainer');
+      viewport.innerHTML = '';
+      tagsContainer.innerHTML = '';
+
+      const topics = getCurrentAgenda();
+
+      const scheduleContainer = document.createElement('div');
+      scheduleContainer.id = 'scheduleContainer';
+
+      const timeLegend = document.createElement('div');
+      timeLegend.id = 'timeLegend';
+      for (let i = 0; i < 24; i++) {
+        const label = document.createElement('div');
+        label.className = 'time-row-label';
+        label.innerText = `${String(i).padStart(2, '0')}:00`;
+        timeLegend.appendChild(label);
+      }
+
+      const timeGridBody = document.createElement('div');
+      timeGridBody.id = 'timeGridBody';
+
+      scheduleContainer.appendChild(timeLegend);
+      scheduleContainer.appendChild(timeGridBody);
+      viewport.appendChild(scheduleContainer);
+
+      topics.forEach((topic) => {
+        const tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.innerText = `${topic.title} (${formatTime(topic.startHour)})`;
+        tagsContainer.appendChild(tag);
+
+        const card = document.createElement('div');
+        card.className = 'topic-card-scheduled';
+        card.style.top = `${topic.startHour * HOUR_HEIGHT}px`;
+        card.style.height = `${Math.max(topic.durationHours * HOUR_HEIGHT, 60)}px`;
+
+        card.innerHTML = `
+          <div class="drag-header">
+            <input type="text" class="topic-title-input" value="${topic.title}">
+            <span class="time-badge">${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}</span>
+            <div class="action-group">
+              <button class="btn btn-orange edit-topic-btn">[ EDIT / DRAW ]</button>
+              <button class="btn remove-topic-btn">X</button>
+            </div>
+          </div>
+          <div class="resize-handle-bottom"></div>
+        `;
+
+        card.querySelector('.edit-topic-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          studioModalInstance.open(topic);
+        });
+
+        card.querySelector('.topic-title-input').addEventListener('change', (e) => {
+          topic.title = e.target.value;
+          saveCurrentDateState();
+          renderAgendaView();
+        });
+
+        card.querySelector('.remove-topic-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          const index = topics.findIndex(t => t.id === topic.id);
+          if (index !== -1) {
+            topics.splice(index, 1);
+            saveCurrentDateState();
+            renderAgendaView();
+          }
+        });
+
+        attachTouchInteraction(card, topic);
+        timeGridBody.appendChild(card);
+      });
+    }
+
+    function attachTouchInteraction(card, topic) {
+      const header = card.querySelector('.drag-header');
+      const resizeHandle = card.querySelector('.resize-handle-bottom');
+
+      let isDragging = false;
+      let isResizing = false;
+      let startY = 0;
+      let initialStartHour = 0;
+      let initialDuration = 0;
+
+      header.addEventListener('pointerdown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+        isDragging = true;
+        startY = e.clientY;
+        initialStartHour = topic.startHour;
+        header.setPointerCapture(e.pointerId);
+      });
+
+      header.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const deltaHours = (e.clientY - startY) / HOUR_HEIGHT;
+        let newStartHour = Math.round((initialStartHour + deltaHours) * 4) / 4;
+        newStartHour = Math.max(0, Math.min(23.75, newStartHour));
+
+        topic.startHour = newStartHour;
+        card.style.top = `${newStartHour * HOUR_HEIGHT}px`;
+        card.querySelector('.time-badge').innerText = 
+          `${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}`;
+      });
+
+      header.addEventListener('pointerup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        saveCurrentDateState();
+        renderAgendaView();
+      });
+
+      resizeHandle.addEventListener('pointerdown', (e) => {
+        isResizing = true;
+        startY = e.clientY;
+        initialDuration = topic.durationHours;
+        resizeHandle.setPointerCapture(e.pointerId);
+        e.stopPropagation();
+      });
+
+      resizeHandle.addEventListener('pointermove', (e) => {
+        if (!isResizing) return;
+        const deltaHours = (e.clientY - startY) / HOUR_HEIGHT;
+        let newDuration = Math.round((initialDuration + deltaHours) * 4) / 4;
+        newDuration = Math.max(0.5, newDuration);
+
+        topic.durationHours = newDuration;
+        card.style.height = `${newDuration * HOUR_HEIGHT}px`;
+        card.querySelector('.time-badge').innerText = 
+          `${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}`;
+      });
+
+      resizeHandle.addEventListener('pointerup', () => {
+        if (!isResizing) return;
+        isResizing = false;
+        saveCurrentDateState();
+        renderAgendaView();
+      });
+    }
+
+    function createNewTopic() {
+      const topics = getCurrentAgenda();
+      topics.push({
+        id: crypto.randomUUID(),
+        title: `#TASK_${topics.length + 1}`,
+        startHour: 9.0,
+        durationHours: 1.0,
+        canvases: [{ id: crypto.randomUUID(), strokes: [] }]
+      });
+      saveCurrentDateState();
+      renderAgendaView();
+    }
+
+    function formatTime(decimalHours) {
+      const hrs = Math.floor(decimalHours);
+      const mins = Math.round((decimalHours - hrs) * 60);
+      return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+
+    // --- App Boot Sequence ---
+    function bindGlobalControls() {
+      document.getElementById('addTopicBtn').addEventListener('click', () => createNewTopic());
+      document.getElementById('prevDateBtn').addEventListener('click', () => changeDate(-1));
+      document.getElementById('nextDateBtn').addEventListener('click', () => changeDate(1));
+
+      document.getElementById('exportBtn').addEventListener('click', () => {
+        const data = JSON.stringify(AppState.agenda[AppState.currentDate] || [], null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `ARCH_AGENDA_${AppState.currentDate}.json`;
+        a.click();
+      });
+    }
+
+    async function changeDate(deltaDays) {
+      const date = new Date(AppState.currentDate);
+      date.setDate(date.getDate() + deltaDays);
+      AppState.currentDate = date.toISOString().split('T')[0];
+      
+      document.getElementById('currentDateDisplay').innerText = AppState.currentDate.replace(/-/g, '.');
+      await loadDateState(AppState.currentDate);
+      renderAgendaView();
+    }
+
+    (async function boot() {
+      await initDB();
+      bindGlobalControls();
+      await loadDateState(AppState.currentDate);
+      renderAgendaView();
+    })();
+  </script>
 </body>
 </html>
