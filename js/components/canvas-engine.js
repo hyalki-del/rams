@@ -1,12 +1,13 @@
 import { saveCurrentDateState } from '../storage.js';
 
 /**
- * Vector Canvas Engine: Handles Sub-Pixel Point Inking & Quadratic Curve Smoothing
+ * Vector Canvas Engine with Stack History (Undo Engine)
  */
 export class CanvasInstance {
-  constructor(container, canvasData) {
+  constructor(container, canvasData, onUpdate) {
     this.container = container;
     this.data = canvasData; // { id, strokes: [] }
+    this.onUpdate = onUpdate; // Callback notification trigger
     this.isDrawing = false;
     this.currentStroke = null;
 
@@ -16,17 +17,18 @@ export class CanvasInstance {
   }
 
   initDOM() {
+    this.container.innerHTML = '';
     this.canvas = document.createElement('canvas');
-    this.canvas.className = 'layer';
     this.container.appendChild(this.canvas);
     this.ctx = this.canvas.getContext('2d');
 
-    // Resize observer for adaptive viewport scaling
+    this.resize();
     new ResizeObserver(() => this.resize()).observe(this.container);
   }
 
   resize() {
     const rect = this.container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
     this.canvas.width = rect.width;
     this.canvas.height = rect.height;
     this.redraw();
@@ -65,14 +67,38 @@ export class CanvasInstance {
     if (!this.isDrawing) return;
     this.isDrawing = false;
     if (this.currentStroke?.points.length > 1) {
+      // Commit stroke to local data array (Command Stack Push)
       this.data.strokes.push(this.currentStroke);
       saveCurrentDateState();
+      if (this.onUpdate) this.onUpdate();
     }
     this.currentStroke = null;
   }
 
+  /**
+   * Undo Engine Operation: Removes top vector stroke from command stack
+   */
+  undo() {
+    if (this.data.strokes.length === 0) return false;
+    this.data.strokes.pop(); // Pop top command
+    saveCurrentDateState();
+    this.redraw();
+    if (this.onUpdate) this.onUpdate();
+    return true;
+  }
+
+  /**
+   * Clears all strokes on current canvas
+   */
+  clear() {
+    this.data.strokes = [];
+    saveCurrentDateState();
+    this.redraw();
+    if (this.onUpdate) this.onUpdate();
+  }
+
   renderStroke(stroke) {
-    if (stroke.points.length < 2) return;
+    if (!stroke.points || stroke.points.length < 2) return;
     const ctx = this.ctx;
     ctx.save();
     ctx.strokeStyle = stroke.color;
@@ -94,6 +120,7 @@ export class CanvasInstance {
   }
 
   redraw() {
+    if (!this.ctx) return;
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     this.data.strokes.forEach(s => this.renderStroke(s));
   }
