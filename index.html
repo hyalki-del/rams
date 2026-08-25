@@ -3,139 +3,996 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ARCH // LOGBOOK</title>
-    <link rel="stylesheet" href="css/main.css">
+    <title>RAMS V1.0 // ARCHITECTURAL AGENDA & LOGBOOK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;0,800;1,400&display=swap');
+
+        :root {
+            --bg-paper: #F4F4F0;
+            --color-graphite: #1C1C1E;
+            --color-divider: #1C1C1E;
+            --color-signal-orange: #FF4800;
+        }
+
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+
+        body {
+            background-color: var(--bg-paper);
+            color: var(--color-graphite);
+            font-family: 'JetBrains Mono', monospace;
+            -webkit-user-select: none;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Technical Paper Grid Background */
+        .grid-bg {
+            background-size: 20px 20px;
+            background-image: 
+                linear-gradient(to right, rgba(28, 28, 30, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(28, 28, 30, 0.05) 1px, transparent 1px);
+        }
+
+        /* Rams UI Component Styles */
+        .rams-border {
+            border: 2px solid var(--color-graphite);
+        }
+
+        .rams-button {
+            border: 2px solid var(--color-graphite);
+            background: #FFFFFF;
+            font-weight: 800;
+            text-transform: uppercase;
+            transition: all 0.1s ease;
+            box-shadow: 2px 2px 0px var(--color-graphite);
+        }
+
+        .rams-button:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px var(--color-graphite);
+        }
+
+        .topic-box {
+            border: 2px solid var(--color-graphite);
+            background: #FFFFFF;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            box-shadow: 3px 3px 0px var(--color-graphite);
+            position: relative;
+        }
+
+        .topic-box:active {
+            transform: translate(2px, 2px);
+            box-shadow: 1px 1px 0px var(--color-graphite);
+        }
+
+        /* Slide-up Studio Canvas Modal */
+        #studioModal {
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateY(100%);
+        }
+
+        #studioModal.open {
+            transform: translateY(0%);
+        }
+
+        /* Floating Tool Panel */
+        .floating-toolbar {
+            background: rgba(244, 244, 240, 0.95);
+            backdrop-filter: blur(8px);
+            border: 2px solid var(--color-graphite);
+            box-shadow: 4px 4px 0px var(--color-graphite);
+        }
+
+        /* Sub-panel flyouts */
+        .flyout-panel {
+            background: #FFFFFF;
+            border: 2px solid var(--color-graphite);
+            box-shadow: 4px 4px 0px var(--color-graphite);
+        }
+
+        .color-dot {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--color-graphite);
+            cursor: pointer;
+        }
+
+        .color-dot.active {
+            outline: 2px solid var(--color-signal-orange);
+            outline-offset: 2px;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track { background: var(--bg-paper); }
+        ::-webkit-scrollbar-thumb { background: var(--color-graphite); }
+    </style>
 </head>
-<body class="bg-paper text-graphite antialiased select-none overflow-hidden">
+<body class="p-2 sm:p-6 min-h-screen flex flex-col items-center justify-start grid-bg">
 
-    <!-- MAIN SHELL: DIETER RAMS GRID AGENDABOOK -->
-    <div id="appContainer" class="flex flex-col h-screen w-screen">
+    <!-- ===================================================================== -->
+    <!-- 1. MAIN CLIPBOARD SHEET (Agenda View)                                 -->
+    <!-- ===================================================================== -->
+    <div class="w-full max-w-5xl bg-[#F4F4F0] rams-border p-4 sm:p-8 shadow-2xl relative min-h-[92vh] flex flex-col justify-between my-auto">
         
-        <!-- HEADER / NAVIGATION BAR -->
-        <header class="h-14 border-b border-divider flex items-center justify-between px-6 bg-paper shrink-0">
-            <div class="flex items-center space-x-4">
-                <span class="font-mono text-xs tracking-widest uppercase font-extrabold text-graphite">ARCH // LOGBOOK</span>
-                <span class="text-divider">|</span>
-                <div class="flex items-center space-x-2">
-                    <button id="btnPrevDate" class="btn-ram-icon">◄</button>
-                    <input type="date" id="datePicker" class="bg-transparent font-mono text-xs font-bold text-graphite focus:outline-none cursor-pointer">
-                    <button id="btnNextDate" class="btn-ram-icon">►</button>
+        <!-- HEADER ZONE -->
+        <header class="border-b-2 border-[#1C1C1E] pb-4 mb-6">
+            <div class="flex flex-wrap justify-between items-start gap-4">
+                
+                <!-- Title & Brand Identity -->
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 bg-[#FF4800] inline-block"></span>
+                        <h1 class="text-lg sm:text-xl font-black tracking-widest text-[#1C1C1E] uppercase">
+                            RAMS_LOGBOOK // V1.0
+                        </h1>
+                    </div>
+                    <p class="text-xs font-semibold italic text-slate-600 mt-1">
+                        "Good design is as little design as possible." — Dieter Rams
+                    </p>
                 </div>
-            </div>
 
-            <div class="flex items-center space-x-3">
-                <button id="btnExportJSON" class="btn-ram text-xs">EXPORT .JSON</button>
-                <button id="btnImportJSON" class="btn-ram text-xs">IMPORT</button>
-                <input type="file" id="fileImport" accept=".json" class="hidden">
+                <!-- Date Controls -->
+                <div class="flex items-center gap-2">
+                    <button id="btnPrevDay" class="rams-button px-3 py-1.5 text-xs">◄ PREV</button>
+                    <div class="rams-border bg-white px-3 py-1 text-center shadow-[2px_2px_0px_#1C1C1E] relative">
+                        <input type="date" id="dateInput" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                        <span id="dateDisplay" class="text-xs font-black uppercase tracking-wider">YYYY.MM.DD</span>
+                    </div>
+                    <button id="btnNextDay" class="rams-button px-3 py-1.5 text-xs">NEXT ►</button>
+                    <button id="btnToday" class="rams-button px-3 py-1.5 text-xs bg-[#FF4800] text-white">TODAY</button>
+                </div>
             </div>
         </header>
 
-        <!-- AGENDA SHEET WORKSPACE -->
-        <main class="flex-1 overflow-y-auto p-6 md:p-12">
-            <div class="max-w-4xl mx-auto border border-divider bg-paper-light shadow-ram p-8 min-h-[85vh] flex flex-col justify-between relative">
-                
-                <!-- TOPIC CREATION BAR -->
-                <div class="space-y-6">
-                    <div class="flex items-center justify-between border-b border-graphite pb-4">
-                        <div>
-                            <h1 id="displayDateHeading" class="font-mono text-xl font-black uppercase tracking-wider">2026.08.25</h1>
-                            <p class="text-xs font-mono text-graphite-light mt-0.5">DAILY SITE RECORD & REDLINE LOGBOOK</p>
-                        </div>
-                        <button id="btnNewTopic" class="btn-ram-accent text-xs">+ NEW TOPIC CARD</button>
-                    </div>
+        <!-- TIME-GRID MATRIX -->
+        <section class="space-y-3 flex-1 overflow-y-auto pr-1" id="agendaGrid">
+            <!-- Dynamically populated 07:00 to 19:00 hourly slots -->
+        </section>
 
-                    <!-- DYNAMIC TOPIC CARDS CONTAINER -->
-                    <div id="topicContainer" class="grid grid-cols-1 gap-4">
-                        <!-- Rendered by agenda.js -->
-                    </div>
-                </div>
-
-                <!-- FOOTER METADATA -->
-                <div class="pt-8 border-t border-divider flex justify-between items-center text-[10px] font-mono text-graphite-light">
-                    <span>GRID SYSTEM: 1PX SOLID (#E2E2DC)</span>
-                    <span>DIETER RAMS SYSTEM 01 // LOCAL-FIRST ENGINE</span>
-                </div>
+        <!-- FOOTER BAR -->
+        <footer class="mt-6 pt-3 border-t-2 border-[#1C1C1E] flex flex-wrap justify-between items-center text-[10px] font-bold text-slate-600 uppercase gap-2">
+            <div class="flex gap-4">
+                <span>SYSTEM: LOCAL-FIRST INDEXEDDB</span>
+                <span id="syncStatus" class="text-[#FF4800]">STATUS: IDLE</span>
             </div>
-        </main>
+            <div class="flex gap-2">
+                <button id="btnExportJSON" class="rams-button px-2 py-1 text-[10px]">EXPORT BACKUP (.JSON)</button>
+                <button id="btnImportJSON" class="rams-button px-2 py-1 text-[10px]">RESTORE BACKUP</button>
+                <input type="file" id="fileImport" class="hidden" accept=".json">
+            </div>
+        </footer>
     </div>
 
-    <!-- STUDIO DRAFTING MODAL WORKSPACE -->
-    <div id="studioModal" class="fixed inset-0 bg-graphite/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-paper border-2 border-graphite w-full h-full max-w-6xl max-h-[92vh] flex flex-col shadow-ram-lg overflow-hidden">
+    <!-- ===================================================================== -->
+    <!-- 2. STUDIO MODAL WORKSPACE (Slides from Bottom)                       -->
+    <!-- ===================================================================== -->
+    <div id="studioModal" class="fixed inset-0 z-50 bg-[#F4F4F0] flex flex-col justify-between overflow-hidden">
+        
+        <!-- TOP OVERLAY BANNER -->
+        <header class="h-14 border-b-2 border-[#1C1C1E] bg-[#F4F4F0] px-4 sm:px-6 flex justify-between items-center shrink-0 z-10">
+            <div class="flex items-center gap-3">
+                <span class="w-3 h-3 bg-[#FF4800]"></span>
+                <span id="studioTopicTitle" class="text-xs sm:text-sm font-black uppercase tracking-widest text-[#1C1C1E]">
+                    TOPIC: UNTITLED
+                </span>
+                <span id="studioTimeTag" class="text-[10px] font-bold bg-[#1C1C1E] text-white px-2 py-0.5">
+                    00:00
+                </span>
+            </div>
+
+            <!-- Header Action Controls -->
+            <div class="flex items-center gap-2">
+                <button id="btnUndo" class="rams-button px-3 py-1 text-xs">UNDO</button>
+                <button id="btnRedo" class="rams-button px-3 py-1 text-xs">REDO</button>
+                <button id="btnClearCanvas" class="rams-button px-3 py-1 text-xs text-red-600">CLEAR</button>
+                <button id="btnCloseStudio" class="rams-button px-4 py-1 text-xs bg-[#1C1C1E] text-white">SAVE & CLOSE ✕</button>
+            </div>
+        </header>
+
+        <!-- STACKED CANVAS ENGINE AREA -->
+        <div id="canvasViewport" class="flex-1 relative overflow-hidden bg-[#FFFFFF] cursor-crosshair">
+            <!-- Grid Underlay -->
+            <div class="absolute inset-0 grid-bg opacity-40 pointer-events-none"></div>
+
+            <!-- Layer 1: Background & Imported Photo Layer -->
+            <canvas id="bgCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
             
-            <!-- MODAL HEADER BAR -->
-            <div class="h-12 border-b border-graphite px-4 bg-paper flex items-center justify-between shrink-0">
-                <div class="flex items-center space-x-3">
-                    <span id="studioTopicBadge" class="bg-signal-orange text-white text-[10px] font-mono px-2 py-0.5 font-bold uppercase">#ELEVATION</span>
-                    <h2 id="studioTopicTitle" class="font-mono text-xs font-extrabold uppercase truncate max-w-md">NORTH ELEVATION REDLINES</h2>
-                </div>
+            <!-- Layer 2 & 3: Active Vector Vector Drawing Layers -->
+            <canvas id="drawCanvas" class="absolute inset-0 w-full h-full touch-none z-20"></canvas>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- 3. RIGHT-HAND FLOATING TOOLBAR & CONTROLS                             -->
+        <!-- ===================================================================== -->
+        <div class="absolute right-4 top-20 z-30 flex flex-col gap-3 items-end">
+            
+            <!-- Main Vertical Toolstrip -->
+            <div class="floating-toolbar p-2 flex flex-col gap-3">
+                <!-- Pen Tool -->
+                <button id="toolPen" class="w-10 h-10 rams-border bg-white flex items-center justify-center relative active-tool" title="Inking Pen">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+
+                <!-- Eraser Tool -->
+                <button id="toolEraser" class="w-10 h-10 rams-border bg-white flex items-center justify-center" title="Eraser">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+
+                <!-- Layers Manager Tool -->
+                <button id="toolLayers" class="w-10 h-10 rams-border bg-white flex items-center justify-center relative" title="Layers Management">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <span id="activeLayerIndicator" class="absolute -bottom-1 -right-1 text-[9px] font-extrabold bg-[#FF4800] text-white w-4 h-4 rounded-full flex items-center justify-center">L2</span>
+                </button>
+
+                <!-- Photo / Blueprint Import Tool -->
+                <button id="toolCamera" class="w-10 h-10 rams-border bg-white flex items-center justify-center" title="Add Photo / Blueprint">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+                </button>
+                <input type="file" id="photoInput" class="hidden" accept="image/*">
+            </div>
+
+            <!-- SUB-PANEL: Pen Properties Flyout -->
+            <div id="penPropertiesPanel" class="flyout-panel p-3 flex flex-col gap-3 w-48 hidden">
+                <span class="text-[10px] font-black uppercase text-slate-500 tracking-wider">TIP SIZE & COLOR</span>
                 
-                <div class="flex items-center space-x-2">
-                    <button id="btnCloseStudio" class="btn-ram-danger text-xs px-3">CLOSE & SAVE</button>
+                <!-- Stroke Width Selector -->
+                <div class="flex justify-between items-center">
+                    <button class="btn-size w-7 h-7 rams-border flex items-center justify-center text-xs font-bold" data-size="1">1px</button>
+                    <button class="btn-size w-7 h-7 rams-border flex items-center justify-center text-xs font-bold active-size bg-slate-200" data-size="3">3px</button>
+                    <button class="btn-size w-7 h-7 rams-border flex items-center justify-center text-xs font-bold" data-size="6">6px</button>
+                    <button class="btn-size w-7 h-7 rams-border flex items-center justify-center text-xs font-bold" data-size="12">12px</button>
+                </div>
+
+                <!-- Palette Selector -->
+                <div class="flex justify-between items-center pt-2 border-t border-slate-200">
+                    <div class="color-dot active" style="background: #1C1C1E;" data-color="#1C1C1E"></div>
+                    <div class="color-dot" style="background: #FF4800;" data-color="#FF4800"></div>
+                    <div class="color-dot" style="background: #0055FF;" data-color="#0055FF"></div>
+                    <div class="color-dot" style="background: #009944;" data-color="#009944"></div>
                 </div>
             </div>
 
-            <!-- MODAL WORKSPACE GRID -->
-            <div class="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-hidden">
+            <!-- SUB-PANEL: Eraser Mode Flyout -->
+            <div id="eraserPropertiesPanel" class="flyout-panel p-3 flex flex-col gap-2 w-44 hidden">
+                <span class="text-[10px] font-black uppercase text-slate-500 tracking-wider">ERASER MODE</span>
+                <button id="btnEraserStroke" class="rams-button px-2 py-1 text-[10px] text-left">PRECISION ERASER</button>
+                <button id="btnEraserClearAll" class="rams-button px-2 py-1 text-[10px] text-left text-red-600">ERASE ALL MARKS</button>
+            </div>
+
+            <!-- SUB-PANEL: Layer Management Flyout -->
+            <div id="layerPropertiesPanel" class="flyout-panel p-3 flex flex-col gap-2 w-52 hidden">
+                <span class="text-[10px] font-black uppercase text-slate-500 tracking-wider">ACTIVE DRAWING LAYER</span>
                 
-                <!-- LEFT SIDEBAR: HYBRID TEXT / METADATA NOTES -->
-                <div class="md:col-span-4 border-r border-graphite p-4 flex flex-col space-y-4 bg-paper-light overflow-y-auto">
-                    <div>
-                        <label class="block font-mono text-[10px] uppercase font-bold text-graphite-light mb-1">TOPIC TITLE</label>
-                        <input type="text" id="studioInputTitle" class="input-ram w-full font-mono text-xs font-bold">
-                    </div>
-
-                    <div>
-                        <label class="block font-mono text-[10px] uppercase font-bold text-graphite-light mb-1">TOPIC TAGS (COMMA SEPARATED)</label>
-                        <input type="text" id="studioInputTags" placeholder="ELEVATION, SITE, REVISION" class="input-ram w-full font-mono text-xs">
-                    </div>
-
-                    <div class="flex-1 flex flex-col">
-                        <label class="block font-mono text-[10px] uppercase font-bold text-graphite-light mb-1">TYPED NOTES & SCRIBBLE SUMMARY</label>
-                        <textarea id="studioInputNotes" placeholder="Write detailed text notes, field observations, or use iPadOS Scribble..." class="input-ram w-full flex-1 font-mono text-xs resize-none p-3 leading-relaxed"></textarea>
-                    </div>
+                <div class="space-y-1.5">
+                    <button class="btn-layer-select w-full p-2 rams-border text-left text-xs font-extrabold flex justify-between items-center" data-layer="L3">
+                        <span>L3: REDLINE MARKUP</span>
+                        <span class="layer-status text-[9px] text-slate-400">INACTIVE</span>
+                    </button>
+                    <button class="btn-layer-select w-full p-2 rams-border text-left text-xs font-extrabold flex justify-between items-center bg-slate-100" data-layer="L2">
+                        <span>L2: VECTOR PENCIL</span>
+                        <span class="layer-status text-[9px] text-[#FF4800]">ACTIVE</span>
+                    </button>
+                    <button class="btn-layer-select w-full p-2 rams-border text-left text-xs font-extrabold flex justify-between items-center" data-layer="L1">
+                        <span>L1: PHOTO OVERLAY</span>
+                        <span class="layer-status text-[9px] text-slate-400">IMAGE</span>
+                    </button>
                 </div>
 
-                <!-- RIGHT MAIN: LAYERED CANVAS ENGINE CONTAINER -->
-                <div class="md:col-span-8 flex flex-col relative bg-[#F4F4F0] overflow-hidden">
-                    
-                    <!-- STUDIO TOOLBAR OVERLAY -->
-                    <div class="h-10 border-b border-divider px-3 flex items-center justify-between bg-paper shrink-0 z-30">
-                        <!-- LAYER SELECTOR -->
-                        <div class="flex items-center space-x-1">
-                            <button id="btnLayerPencil" class="btn-layer active" data-layer="L2_Pencil">L2: PENCIL</button>
-                            <button id="btnLayerRedline" class="btn-layer" data-layer="L3_Redline">L3: REDLINE</button>
-                        </div>
-
-                        <!-- DRAWING TOOLS -->
-                        <div class="flex items-center space-x-2">
-                            <button id="btnToolPencil" class="btn-ram-tool active">INK</button>
-                            <button id="btnToolEraser" class="btn-ram-tool">ERASER</button>
-                            <span class="text-divider">|</span>
-                            <button id="btnUndo" class="btn-ram-icon">↩</button>
-                            <button id="btnRedo" class="btn-ram-icon">↪</button>
-                            <button id="btnClearCanvas" class="btn-ram-icon text-signal-orange">✕</button>
-                        </div>
-
-                        <!-- PHOTO SUBSTRATE CONTROLS -->
-                        <div class="flex items-center space-x-2">
-                            <label for="imgLoader" class="btn-ram text-[10px] cursor-pointer">+ IMPORT IMAGE</label>
-                            <input type="file" id="imgLoader" accept="image/*" class="hidden">
-                            <button id="btnPurgeImage" class="btn-ram-danger text-[10px]">PURGE</button>
-                        </div>
-                    </div>
-
-                    <!-- STACKED CANVAS VIEWPORT -->
-                    <div id="canvasViewport" class="flex-1 relative touch-none overflow-hidden cursor-crosshair">
-                        <canvas id="bgCanvas" class="absolute inset-0 pointer-events-none z-10"></canvas>
-                        <canvas id="drawCanvas" class="absolute inset-0 z-20"></canvas>
-                    </div>
+                <div class="pt-2 border-t border-slate-200">
+                    <button id="btnPurgePhoto" class="w-full text-left text-[10px] text-red-600 font-bold uppercase hover:underline">
+                        REMOVE BACKGROUND PHOTO
+                    </button>
                 </div>
             </div>
+
         </div>
     </div>
 
-    <!-- MAIN ENGINE CONTROLLERS -->
-    <script type="module" src="js/app.js"></script>
+    <!-- Context Dialog Modal for Topic Hold Gestures -->
+    <dialog id="topicContextModal" class="rams-border p-4 bg-white shadow-2xl backdrop:bg-black/40">
+        <div class="flex flex-col gap-3 min-w-[220px]">
+            <h3 class="text-xs font-black uppercase tracking-widest border-b pb-2">TOPIC OPTIONS</h3>
+            <button id="ctxEdit" class="rams-button px-3 py-2 text-xs text-left">EDIT TITLE</button>
+            <button id="ctxDelete" class="rams-button px-3 py-2 text-xs text-left text-red-600">DELETE TOPIC</button>
+            <button id="ctxCancel" class="rams-button px-3 py-2 text-xs text-left bg-slate-100">CANCEL</button>
+        </div>
+    </dialog>
+
+    <!-- ===================================================================== -->
+    <!-- 4. APPLICATION LOGIC ENGINE                                          -->
+    <!-- ===================================================================== -->
+    <script>
+        /**
+         * LOCAL STORAGE & INDEXEDDB PERSISTENCE ENGINE
+         */
+        class StorageEngine {
+            constructor() {
+                this.dbName = 'RamsArchLogbook';
+                this.dbVersion = 1;
+                this.db = null;
+            }
+
+            async init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, this.dbVersion);
+                    request.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains('entries')) {
+                            db.createObjectStore('entries', { keyPath: 'dateKey' });
+                        }
+                    };
+                    request.onsuccess = (e) => {
+                        this.db = e.target.result;
+                        resolve();
+                    };
+                    request.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            async getEntry(dateKey) {
+                return new Promise((resolve) => {
+                    if (!this.db) return resolve(null);
+                    const tx = this.db.transaction('entries', 'readonly');
+                    const store = tx.objectStore('entries');
+                    const req = store.get(dateKey);
+                    req.onsuccess = () => resolve(req.result || null);
+                    req.onerror = () => resolve(null);
+                });
+            }
+
+            async saveEntry(entryData) {
+                return new Promise((resolve, reject) => {
+                    if (!this.db) return reject('DB Not Initialized');
+                    const tx = this.db.transaction('entries', 'readwrite');
+                    const store = tx.objectStore('entries');
+                    const req = store.put(entryData);
+                    req.onsuccess = () => resolve();
+                    req.onerror = (e) => reject(e.target.error);
+                });
+            }
+
+            async getAllEntries() {
+                return new Promise((resolve) => {
+                    if (!this.db) return resolve([]);
+                    const tx = this.db.transaction('entries', 'readonly');
+                    const store = tx.objectStore('entries');
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => resolve([]);
+                });
+            }
+        }
+
+        /**
+         * GLOBAL STATE MODEL
+         */
+        const AppState = {
+            currentDate: new Date().toISOString().split('T')[0],
+            activeSlot: null,
+            activeTopicId: null,
+            activeTopicTitle: '',
+            agenda: {}, // Structure: { "07:00": [ { id, title, canvasData } ] }
+            currentTool: 'pen', // 'pen', 'eraser'
+            penColor: '#1C1C1E',
+            penSize: 3,
+            activeLayer: 'L2', // 'L1', 'L2', 'L3'
+            history: [],
+            historyStep: -1,
+            strokes: [], // Array of stroke objects for current canvas
+            bgImageBase64: null
+        };
+
+        const db = new StorageEngine();
+
+        // DOM Element Registry
+        const DOM = {
+            dateInput: document.getElementById('dateInput'),
+            dateDisplay: document.getElementById('dateDisplay'),
+            btnPrevDay: document.getElementById('btnPrevDay'),
+            btnNextDay: document.getElementById('btnNextDay'),
+            btnToday: document.getElementById('btnToday'),
+            agendaGrid: document.getElementById('agendaGrid'),
+            studioModal: document.getElementById('studioModal'),
+            studioTopicTitle: document.getElementById('studioTopicTitle'),
+            studioTimeTag: document.getElementById('studioTimeTag'),
+            btnCloseStudio: document.getElementById('btnCloseStudio'),
+            bgCanvas: document.getElementById('bgCanvas'),
+            drawCanvas: document.getElementById('drawCanvas'),
+            canvasViewport: document.getElementById('canvasViewport'),
+            toolPen: document.getElementById('toolPen'),
+            toolEraser: document.getElementById('toolEraser'),
+            toolLayers: document.getElementById('toolLayers'),
+            toolCamera: document.getElementById('toolCamera'),
+            photoInput: document.getElementById('photoInput'),
+            penPropertiesPanel: document.getElementById('penPropertiesPanel'),
+            eraserPropertiesPanel: document.getElementById('eraserPropertiesPanel'),
+            layerPropertiesPanel: document.getElementById('layerPropertiesPanel'),
+            btnUndo: document.getElementById('btnUndo'),
+            btnRedo: document.getElementById('btnRedo'),
+            btnClearCanvas: document.getElementById('btnClearCanvas'),
+            btnEraserClearAll: document.getElementById('btnEraserClearAll'),
+            btnPurgePhoto: document.getElementById('btnPurgePhoto'),
+            topicContextModal: document.getElementById('topicContextModal'),
+            ctxEdit: document.getElementById('ctxEdit'),
+            ctxDelete: document.getElementById('ctxDelete'),
+            ctxCancel: document.getElementById('ctxCancel'),
+            btnExportJSON: document.getElementById('btnExportJSON'),
+            btnImportJSON: document.getElementById('btnImportJSON'),
+            fileImport: document.getElementById('fileImport'),
+            syncStatus: document.getElementById('syncStatus')
+        };
+
+        /**
+         * INITIALIZATION & BOOTSTRAPPER
+         */
+        window.addEventListener('DOMContentLoaded', async () => {
+            await db.init();
+            setupDateControls();
+            setupAgendaGridListeners();
+            setupCanvasEngine();
+            setupStudioToolbar();
+            setupBackupControls();
+            await loadDateEntry(AppState.currentDate);
+        });
+
+        /**
+         * DATE NAVIGATION LOGIC
+         */
+        function setupDateControls() {
+            DOM.dateInput.value = AppState.currentDate;
+            updateDateDisplay(AppState.currentDate);
+
+            DOM.dateInput.addEventListener('change', async (e) => {
+                if (e.target.value) {
+                    AppState.currentDate = e.target.value;
+                    updateDateDisplay(AppState.currentDate);
+                    await loadDateEntry(AppState.currentDate);
+                }
+            });
+
+            DOM.btnPrevDay.addEventListener('click', () => shiftDate(-1));
+            DOM.btnNextDay.addEventListener('click', () => shiftDate(1));
+            DOM.btnToday.addEventListener('click', () => {
+                AppState.currentDate = new Date().toISOString().split('T')[0];
+                DOM.dateInput.value = AppState.currentDate;
+                updateDateDisplay(AppState.currentDate);
+                loadDateEntry(AppState.currentDate);
+            });
+        }
+
+        function shiftDate(offsetDays) {
+            const d = new Date(AppState.currentDate);
+            d.setDate(d.getDate() + offsetDays);
+            AppState.currentDate = d.toISOString().split('T')[0];
+            DOM.dateInput.value = AppState.currentDate;
+            updateDateDisplay(AppState.currentDate);
+            loadDateEntry(AppState.currentDate);
+        }
+
+        function updateDateDisplay(isoString) {
+            const parts = isoString.split('-');
+            DOM.dateDisplay.innerText = `${parts[0]}.${parts[1]}.${parts[2]}`;
+        }
+
+        /**
+         * AGENDA GRID & LONG PRESS / DOUBLE CLICK SYSTEM
+         */
+        const TIME_SLOTS = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
+
+        function renderAgendaGrid() {
+            DOM.agendaGrid.innerHTML = '';
+
+            TIME_SLOTS.forEach(time => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-4 border-b border-[#1C1C1E]/20 pb-3 pt-2';
+                
+                const timeLabel = document.createElement('span');
+                timeLabel.className = 'text-xs font-extrabold w-12 text-right shrink-0 select-none';
+                timeLabel.innerText = time;
+
+                const slotContainer = document.createElement('div');
+                slotContainer.className = 'flex-1 flex items-center gap-3 min-h-[44px] p-1 border border-transparent rounded transition';
+                slotContainer.dataset.timeSlot = time;
+
+                // Populate topic cards if available
+                const topics = AppState.agenda[time] || [];
+                topics.forEach(topic => {
+                    const card = document.createElement('div');
+                    card.className = 'topic-box px-4 py-2 font-extrabold text-xs cursor-pointer flex-1 text-center select-none';
+                    card.innerText = topic.title;
+                    card.dataset.topicId = topic.id;
+                    card.dataset.timeSlot = time;
+                    slotContainer.appendChild(card);
+                });
+
+                row.appendChild(timeLabel);
+                row.appendChild(slotContainer);
+                DOM.agendaGrid.appendChild(row);
+            });
+        }
+
+        function setupAgendaGridListeners() {
+            let pressTimer = null;
+            let longPressTriggered = false;
+            let targetSlot = null;
+            let targetTopicId = null;
+
+            // Long-press and double click events using pointer events
+            DOM.agendaGrid.addEventListener('pointerdown', (e) => {
+                longPressTriggered = false;
+                const slot = e.target.closest('[data-time-slot]');
+                const topicCard = e.target.closest('.topic-box');
+
+                if (!slot) return;
+
+                targetSlot = slot.dataset.timeSlot;
+                targetTopicId = topicCard ? topicCard.dataset.topicId : null;
+
+                pressTimer = setTimeout(() => {
+                    longPressTriggered = true;
+                    if (targetTopicId) {
+                        // Hold on existing Topic Card -> Options Context Menu
+                        openTopicContextMenu(targetSlot, targetTopicId);
+                    } else {
+                        // Hold on Empty Time Slot -> Quick-Create Topic
+                        createNewTopic(targetSlot);
+                    }
+                }, 500);
+            });
+
+            DOM.agendaGrid.addEventListener('pointerup', () => clearTimeout(pressTimer));
+            DOM.agendaGrid.addEventListener('pointerleave', () => clearTimeout(pressTimer));
+
+            // Double Click to Slide-Up Canvas
+            DOM.agendaGrid.addEventListener('dblclick', (e) => {
+                const topicCard = e.target.closest('.topic-box');
+                if (topicCard) {
+                    const slot = topicCard.dataset.timeSlot;
+                    const topicId = topicCard.dataset.topicId;
+                    const topic = AppState.agenda[slot].find(t => t.id === topicId);
+                    if (topic) {
+                        openStudioModal(slot, topic);
+                    }
+                }
+            });
+        }
+
+        function createNewTopic(slotTime) {
+            const title = prompt(`NEW TOPIC FOR ${slotTime}:`, 'SITE REDLINE');
+            if (!title || !title.trim()) return;
+
+            if (!AppState.agenda[slotTime]) {
+                AppState.agenda[slotTime] = [];
+            }
+
+            const newTopic = {
+                id: 'topic_' + Date.now(),
+                title: title.trim().toUpperCase(),
+                strokes: [],
+                bgImage: null
+            };
+
+            AppState.agenda[slotTime].push(newTopic);
+            saveCurrentDateState();
+            renderAgendaGrid();
+        }
+
+        function openTopicContextMenu(slotTime, topicId) {
+            const topic = AppState.agenda[slotTime].find(t => t.id === topicId);
+            if (!topic) return;
+
+            DOM.topicContextModal.showModal();
+
+            DOM.ctxEdit.onclick = () => {
+                DOM.topicContextModal.close();
+                const newTitle = prompt('EDIT TOPIC TITLE:', topic.title);
+                if (newTitle && newTitle.trim()) {
+                    topic.title = newTitle.trim().toUpperCase();
+                    saveCurrentDateState();
+                    renderAgendaGrid();
+                }
+            };
+
+            DOM.ctxDelete.onclick = () => {
+                DOM.topicContextModal.close();
+                if (confirm(`DELETE TOPIC "${topic.title}"?`)) {
+                    AppState.agenda[slotTime] = AppState.agenda[slotTime].filter(t => t.id !== topicId);
+                    saveCurrentDateState();
+                    renderAgendaGrid();
+                }
+            };
+
+            DOM.ctxCancel.onclick = () => DOM.topicContextModal.close();
+        }
+
+        /**
+         * DATA PERSISTENCE BRIDGE
+         */
+        async function loadDateEntry(dateKey) {
+            const record = await db.getEntry(dateKey);
+            if (record && record.agenda) {
+                AppState.agenda = record.agenda;
+            } else {
+                AppState.agenda = {};
+            }
+            renderAgendaGrid();
+        }
+
+        async function saveCurrentDateState() {
+            DOM.syncStatus.innerText = 'STATUS: SAVING...';
+            const record = {
+                dateKey: AppState.currentDate,
+                agenda: AppState.agenda,
+                updatedAt: new Date().toISOString()
+            };
+            await db.saveEntry(record);
+            DOM.syncStatus.innerText = 'STATUS: IDLE';
+        }
+
+        /**
+         * VECTOR CANVAS & INKING ENGINE
+         */
+        let ctxDraw = null;
+        let ctxBg = null;
+        let isDrawing = false;
+        let currentStroke = null;
+
+        function setupCanvasEngine() {
+            ctxDraw = DOM.drawCanvas.getContext('2d');
+            ctxBg = DOM.bgCanvas.getContext('2d');
+
+            window.addEventListener('resize', resizeCanvasBounds);
+
+            // Pointer Event Listeners for Apple Pencil & Stylus Support
+            DOM.drawCanvas.addEventListener('pointerdown', handlePointerDown);
+            DOM.drawCanvas.addEventListener('pointermove', handlePointerMove);
+            DOM.drawCanvas.addEventListener('pointerup', handlePointerUp);
+            DOM.drawCanvas.addEventListener('pointercancel', handlePointerUp);
+
+            // Canvas Toolbar Interaction Hooks
+            DOM.btnCloseStudio.addEventListener('click', closeStudioModal);
+            DOM.btnClearCanvas.addEventListener('click', clearCanvasStrokes);
+            DOM.btnUndo.addEventListener('click', undoCanvas);
+            DOM.btnRedo.addEventListener('click', redoCanvas);
+        }
+
+        function resizeCanvasBounds() {
+            if (!DOM.studioModal.classList.contains('open')) return;
+
+            const rect = DOM.canvasViewport.getBoundingClientRect();
+            DOM.drawCanvas.width = rect.width;
+            DOM.drawCanvas.height = rect.height;
+            DOM.bgCanvas.width = rect.width;
+            DOM.bgCanvas.height = rect.height;
+
+            redrawCanvas();
+        }
+
+        function openStudioModal(slotTime, topic) {
+            AppState.activeSlot = slotTime;
+            AppState.activeTopicId = topic.id;
+            AppState.activeTopicTitle = topic.title;
+            AppState.strokes = topic.strokes || [];
+            AppState.bgImageBase64 = topic.bgImage || null;
+            AppState.history = [JSON.stringify(AppState.strokes)];
+            AppState.historyStep = 0;
+
+            DOM.studioTopicTitle.innerText = `TOPIC: ${topic.title}`;
+            DOM.studioTimeTag.innerText = slotTime;
+
+            DOM.studioModal.classList.add('open');
+            setTimeout(resizeCanvasBounds, 50);
+        }
+
+        function closeStudioModal() {
+            // Save state back to topic object
+            if (AppState.activeSlot && AppState.activeTopicId) {
+                const topic = AppState.agenda[AppState.activeSlot].find(t => t.id === AppState.activeTopicId);
+                if (topic) {
+                    topic.strokes = AppState.strokes;
+                    topic.bgImage = AppState.bgImageBase64;
+                    saveCurrentDateState();
+                }
+            }
+
+            DOM.studioModal.classList.remove('open');
+            hideAllSubPanels();
+        }
+
+        function handlePointerDown(e) {
+            if (AppState.activeLayer === 'L1') return; // L1 is Photo only
+
+            isDrawing = true;
+            DOM.drawCanvas.setPointerCapture(e.pointerId);
+
+            const coords = getCanvasCoords(e);
+            const pressure = e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5;
+
+            currentStroke = {
+                layer: AppState.activeLayer,
+                tool: AppState.currentTool,
+                color: AppState.penColor,
+                size: AppState.penSize,
+                points: [{ x: coords.x, y: coords.y, pressure }]
+            };
+
+            ctxDraw.beginPath();
+            ctxDraw.moveTo(coords.x, coords.y);
+        }
+
+        function handlePointerMove(e) {
+            if (!isDrawing || !currentStroke) return;
+
+            const coords = getCanvasCoords(e);
+            const pressure = e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5;
+
+            currentStroke.points.push({ x: coords.x, y: coords.y, pressure });
+
+            // Incremental Real-time Render
+            renderStrokeSegment(currentStroke, currentStroke.points.length - 2, currentStroke.points.length - 1);
+        }
+
+        function handlePointerUp(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            
+            if (currentStroke && currentStroke.points.length > 0) {
+                AppState.strokes.push(currentStroke);
+                pushHistoryState();
+            }
+            currentStroke = null;
+        }
+
+        function getCanvasCoords(e) {
+            const rect = DOM.drawCanvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function renderStrokeSegment(stroke, startIndex, endIndex) {
+            if (stroke.points.length < 2) return;
+
+            ctxDraw.save();
+            ctxDraw.lineCap = 'round';
+            ctxDraw.lineJoin = 'round';
+
+            if (stroke.tool === 'eraser') {
+                ctxDraw.globalCompositeOperation = 'destination-out';
+                ctxDraw.lineWidth = stroke.size * 8;
+            } else {
+                ctxDraw.globalCompositeOperation = 'source-over';
+                ctxDraw.strokeStyle = stroke.color;
+                // Modulate thickness by pressure sensitivity
+                const p = stroke.points[endIndex].pressure;
+                ctxDraw.lineWidth = Math.max(1, stroke.size * (p * 2));
+            }
+
+            const p1 = stroke.points[startIndex];
+            const p2 = stroke.points[endIndex];
+
+            ctxDraw.beginPath();
+            ctxDraw.moveTo(p1.x, p1.y);
+            ctxDraw.lineTo(p2.x, p2.y);
+            ctxDraw.stroke();
+            ctxDraw.restore();
+        }
+
+        function redrawCanvas() {
+            if (!ctxDraw || !ctxBg) return;
+
+            // Clear Draw Canvas
+            ctxDraw.clearRect(0, 0, DOM.drawCanvas.width, DOM.drawCanvas.height);
+            ctxBg.clearRect(0, 0, DOM.bgCanvas.width, DOM.bgCanvas.height);
+
+            // Render Background Photo (Layer 1)
+            if (AppState.bgImageBase64) {
+                const img = new Image();
+                img.onload = () => {
+                    ctxBg.drawImage(img, 0, 0, DOM.bgCanvas.width, DOM.bgCanvas.height);
+                };
+                img.src = AppState.bgImageBase64;
+            }
+
+            // Render Strokes
+            AppState.strokes.forEach(stroke => {
+                for (let i = 0; i < stroke.points.length - 1; i++) {
+                    renderStrokeSegment(stroke, i, i + 1);
+                }
+            });
+        }
+
+        /**
+         * UNDO / REDO / HISTORY ENGINE
+         */
+        function pushHistoryState() {
+            AppState.history = AppState.history.slice(0, AppState.historyStep + 1);
+            AppState.history.push(JSON.stringify(AppState.strokes));
+            AppState.historyStep++;
+        }
+
+        function undoCanvas() {
+            if (AppState.historyStep > 0) {
+                AppState.historyStep--;
+                AppState.strokes = JSON.parse(AppState.history[AppState.historyStep]);
+                redrawCanvas();
+            }
+        }
+
+        function redoCanvas() {
+            if (AppState.historyStep < AppState.history.length - 1) {
+                AppState.historyStep++;
+                AppState.strokes = JSON.parse(AppState.history[AppState.historyStep]);
+                redrawCanvas();
+            }
+        }
+
+        function clearCanvasStrokes() {
+            if (confirm("CLEAR ALL VECTOR MARKS ON THIS CANVAS?")) {
+                AppState.strokes = [];
+                pushHistoryState();
+                redrawCanvas();
+            }
+        }
+
+        /**
+         * FLOATING TOOLBAR CONTROLS & SUB-PANELS
+         */
+        function setupStudioToolbar() {
+            // Tool Toggles
+            DOM.toolPen.addEventListener('click', () => {
+                setActiveTool('pen');
+                toggleSubPanel(DOM.penPropertiesPanel);
+            });
+
+            DOM.toolEraser.addEventListener('click', () => {
+                setActiveTool('eraser');
+                toggleSubPanel(DOM.eraserPropertiesPanel);
+            });
+
+            DOM.toolLayers.addEventListener('click', () => {
+                toggleSubPanel(DOM.layerPropertiesPanel);
+            });
+
+            DOM.toolCamera.addEventListener('click', () => {
+                DOM.photoInput.click();
+            });
+
+            DOM.photoInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        AppState.bgImageBase64 = evt.target.result;
+                        redrawCanvas();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            // Pen Sizes Selector
+            document.querySelectorAll('.btn-size').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.btn-size').forEach(b => b.classList.remove('bg-slate-200'));
+                    e.target.classList.add('bg-slate-200');
+                    AppState.penSize = parseInt(e.target.dataset.size);
+                });
+            });
+
+            // Color Palette Selector
+            document.querySelectorAll('.color-dot').forEach(dot => {
+                dot.addEventListener('click', (e) => {
+                    document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+                    e.target.classList.add('active');
+                    AppState.penColor = e.target.dataset.color;
+                });
+            });
+
+            // Layer Selector Buttons
+            document.querySelectorAll('.btn-layer-select').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const layerBtn = e.target.closest('.btn-layer-select');
+                    const selectedLayer = layerBtn.dataset.layer;
+                    
+                    AppState.activeLayer = selectedLayer;
+                    document.getElementById('activeLayerIndicator').innerText = selectedLayer;
+
+                    document.querySelectorAll('.btn-layer-select').forEach(b => {
+                        b.classList.remove('bg-slate-100');
+                        b.querySelector('.layer-status').innerText = 'INACTIVE';
+                        b.querySelector('.layer-status').classList.remove('text-[#FF4800]');
+                    });
+
+                    layerBtn.classList.add('bg-slate-100');
+                    layerBtn.querySelector('.layer-status').innerText = 'ACTIVE';
+                    layerBtn.querySelector('.layer-status').classList.add('text-[#FF4800]');
+                });
+            });
+
+            // Purge Photo Control
+            DOM.btnPurgePhoto.addEventListener('click', () => {
+                if (confirm("REMOVE BACKGROUND PHOTO FROM THIS CANVAS?")) {
+                    AppState.bgImageBase64 = null;
+                    redrawCanvas();
+                    hideAllSubPanels();
+                }
+            });
+
+            DOM.btnEraserClearAll.addEventListener('click', () => {
+                clearCanvasStrokes();
+                hideAllSubPanels();
+            });
+        }
+
+        function setActiveTool(tool) {
+            AppState.currentTool = tool;
+            DOM.toolPen.classList.toggle('bg-slate-200', tool === 'pen');
+            DOM.toolEraser.classList.toggle('bg-slate-200', tool === 'eraser');
+        }
+
+        function toggleSubPanel(panel) {
+            const isHidden = panel.classList.contains('hidden');
+            hideAllSubPanels();
+            if (isHidden) {
+                panel.classList.remove('hidden');
+            }
+        }
+
+        function hideAllSubPanels() {
+            DOM.penPropertiesPanel.classList.add('hidden');
+            DOM.eraserPropertiesPanel.classList.add('hidden');
+            DOM.layerPropertiesPanel.classList.add('hidden');
+        }
+
+        /**
+         * JSON BACKUP & RESTORE ENGINE
+         */
+        function setupBackupControls() {
+            DOM.btnExportJSON.addEventListener('click', async () => {
+                const allData = await db.getAllEntries();
+                const jsonBlob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(jsonBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `RAMS_LOGBOOK_BACKUP_${AppState.currentDate}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            });
+
+            DOM.btnImportJSON.addEventListener('click', () => DOM.fileImport.click());
+
+            DOM.fileImport.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const importedEntries = JSON.parse(evt.target.result);
+                        if (Array.isArray(importedEntries)) {
+                            for (const entry of importedEntries) {
+                                await db.saveEntry(entry);
+                            }
+                            alert('LOGBOOK RESTORED SUCCESSFULLY.');
+                            await loadDateEntry(AppState.currentDate);
+                        }
+                    } catch (err) {
+                        alert('INVALID BACKUP FILE.');
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+    </script>
 </body>
 </html>
