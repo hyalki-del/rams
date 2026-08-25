@@ -1,75 +1,96 @@
-import { AppState } from './state.js';
+/**
+ * Offline-First IndexedDB Engine with Vector Serialization
+ */
+const DB_NAME = 'ArchLogbookDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'agenda_entries';
 
-export async function initDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('ArchMultiCanvasAgendaDB', 3);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('agenda_store')) {
-        db.createObjectStore('agenda_store', { keyPath: 'isoDate' });
-      }
-    };
-    req.onsuccess = (e) => {
-      AppState.db = e.target.result;
-      document.getElementById('storageStatus').innerText = "STORAGE: IDB_ONLINE";
-      resolve(AppState.db);
-    };
-    req.onerror = reject;
-  });
-}
-
-export async function saveCurrentDateState() {
-  if (!AppState.db) return;
-  const tx = AppState.db.transaction('agenda_store', 'readwrite');
-  tx.objectStore('agenda_store').put({
-    isoDate: AppState.currentDate,
-    updatedAt: Date.now(),
-    topics: AppState.agenda[AppState.currentDate] || []
-  });
-}
-
-export async function loadDateState(isoDate) {
-  if (!AppState.db) return;
-  return new Promise((resolve) => {
-    const tx = AppState.db.transaction('agenda_store', 'readonly');
-    const req = tx.objectStore('agenda_store').get(isoDate);
-    req.onsuccess = () => {
-      AppState.agenda[isoDate] = req.result ? req.result.topics : [];
-      resolve(AppState.agenda[isoDate]);
-    };
-  });
-}
-
-export async function syncToGoogleCloud() {
-  const status = document.getElementById('storageStatus');
-  const endpoint = AppState.config?.googleAppsScriptEndpoint;
-
-  if (!endpoint || endpoint.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-    alert("Please set a valid Google Apps Script Web App URL in config.json");
-    return;
-  }
-
-  status.innerText = "CLOUD: SYNCING...";
-  try {
-    const payload = {
-      isoDate: AppState.currentDate,
-      topics: AppState.agenda[AppState.currentDate] || []
-    };
-
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-    if (data.status === "SUCCESS") {
-      status.innerText = "CLOUD: SYNC_OK";
-    } else {
-      throw new Error(data.message || "Execution Error");
+class StorageEngine {
+    constructor() {
+        this.db = null;
     }
-  } catch (err) {
-    status.innerText = "CLOUD: SYNC_ERR";
-    console.error("Cloud Sync Exception:", err);
-  }
+
+    async init() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'date' });
+                }
+            };
+
+            request.onsuccess = (e) => {
+                this.db = e.target.result;
+                resolve(this.db);
+            };
+
+            request.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    async getEntry(dateKey) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const request = store.get(dateKey);
+
+            request.onsuccess = () => {
+                if (request.result) {
+                    resolve(request.result);
+                } else {
+                    // Return fresh day schema
+                    resolve({
+                        date: dateKey,
+                        topics: []
+                    });
+                }
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async saveEntry(entryData) {
+        return new Promise((resolve, reject) => {
+            const tx = this.db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const request = store.put(entryData);
+
+            request.onsuccess = () => resolve(true);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async exportJSON() {
+        const tx = this.db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.getAll();
+
+        return new Promise((resolve) => {
+            request.onsuccess = () => {
+                const blob = new Blob([JSON.stringify(request.result, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ARCH_LOGBOOK_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                resolve();
+            };
+        });
+    }
+
+    async importJSON(file) {
+        const text = await file.text();
+        const entries = JSON.parse(text);
+        const tx = this.db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+
+        for (const entry of entries) {
+            await store.put(entry);
+        }
+    }
 }
+
+export const storage = new StorageEngine();
