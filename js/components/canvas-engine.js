@@ -1,124 +1,224 @@
-import { saveCurrentDateState } from '../storage.js';
+/**
+ * Vector Inking Engine with 120Hz Coalesced Sub-pixel Sampling & Multi-Layer Rendering
+ */
+import { store } from '../state.js';
 
-export class CanvasInstance {
-  constructor(container, canvasData, onUpdate) {
-    this.container = container;
-    this.data = canvasData;
-    this.onUpdate = onUpdate;
-    this.isDrawing = false;
-    this.currentStroke = null;
+export class CanvasEngine {
+    constructor(viewportEl, bgCanvas, drawCanvas) {
+        this.viewport = viewportEl;
+        this.bgCanvas = bgCanvas;
+        this.drawCanvas = drawCanvas;
+        this.bgCtx = bgCanvas.getContext('2d');
+        this.drawCtx = drawCanvas.getContext('2d');
 
-    this.initDOM();
-    this.bindEvents();
-    this.redraw();
-  }
+        this.isDrawing = false;
+        this.strokes = []; // Active vector stroke array
+        this.undoStack = [];
+        this.redoStack = [];
+        this.currentStroke = null;
+        this.backgroundImage = null; // Base64 data string
 
-  initDOM() {
-    this.container.innerHTML = '';
-    this.canvas = document.createElement('canvas');
-    this.container.appendChild(this.canvas);
-    this.ctx = this.canvas.getContext('2d');
-
-    this.resize();
-    new ResizeObserver(() => this.resize()).observe(this.container);
-  }
-
-  resize() {
-    const rect = this.container.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    this.canvas.width = rect.width;
-    this.canvas.height = rect.height;
-    this.redraw();
-  }
-
-  bindEvents() {
-    this.canvas.addEventListener('pointerdown', (e) => this.onPointerDown(e));
-    this.canvas.addEventListener('pointermove', (e) => this.onPointerMove(e));
-    this.canvas.addEventListener('pointerup', () => this.onPointerUp());
-  }
-
-  onPointerDown(e) {
-    this.isDrawing = true;
-    const rect = this.canvas.getBoundingClientRect();
-    this.currentStroke = {
-      id: crypto.randomUUID(),
-      color: '#1C1C1A',
-      width: 2,
-      points: [{ x: e.clientX - rect.left, y: e.clientY - rect.top, pressure: e.pressure || 0.5 }]
-    };
-  }
-
-  onPointerMove(e) {
-    if (!this.isDrawing || !this.currentStroke) return;
-    const rect = this.canvas.getBoundingClientRect();
-    
-    // Update live metrics on bottom bar
-    const metrics = document.getElementById('pointerMetrics');
-    if (metrics) {
-      metrics.innerText = `X: ${(e.clientX - rect.left).toFixed(0)} | Y: ${(e.clientY - rect.top).toFixed(0)} | P: ${(e.pressure || 0).toFixed(2)}`;
+        this.initResizeObserver();
+        this.bindPointerEvents();
     }
 
-    this.currentStroke.points.push({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-      pressure: e.pressure || 0.5
-    });
-
-    this.renderStroke(this.currentStroke);
-  }
-
-  onPointerUp() {
-    if (!this.isDrawing) return;
-    this.isDrawing = false;
-    if (this.currentStroke?.points.length > 1) {
-      this.data.strokes.push(this.currentStroke);
-      saveCurrentDateState();
-      if (this.onUpdate) this.onUpdate();
+    initResizeObserver() {
+        const resize = () => {
+            const rect = this.viewport.getBoundingClientRect();
+            this.bgCanvas.width = rect.width;
+            this.bgCanvas.height = rect.height;
+            this.drawCanvas.width = rect.width;
+            this.drawCanvas.height = rect.height;
+            this.redrawAll();
+        };
+        new ResizeObserver(resize).observe(this.viewport);
     }
-    this.currentStroke = null;
-  }
 
-  undo() {
-    if (this.data.strokes.length === 0) return false;
-    this.data.strokes.pop();
-    saveCurrentDateState();
-    this.redraw();
-    if (this.onUpdate) this.onUpdate();
-    return true;
-  }
-
-  clear() {
-    this.data.strokes = [];
-    saveCurrentDateState();
-    this.redraw();
-    if (this.onUpdate) this.onUpdate();
-  }
-
-  renderStroke(stroke) {
-    if (!stroke.points || stroke.points.length < 2) return;
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.strokeStyle = stroke.color;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-
-    for (let i = 1; i < stroke.points.length - 1; i++) {
-      const midX = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
-      const midY = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
-      ctx.lineWidth = (stroke.points[i].pressure || 0.5) * stroke.width * 2;
-      ctx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, midX, midY);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(midX, midY);
+    bindPointerEvents() {
+        this.drawCanvas.addEventListener('pointerdown', this.handlePointerDown.bind(this));
+        this.drawCanvas.addEventListener('pointermove', this.handlePointerMove.bind(this));
+        this.drawCanvas.addEventListener('pointerup', this.handlePointerUp.bind(this));
+        this.drawCanvas.addEventListener('pointercancel', this.handlePointerUp.bind(this));
     }
-    ctx.restore();
-  }
 
-  redraw() {
-    if (!this.ctx) return;
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.data.strokes.forEach(s => this.renderStroke(s));
-  }
+    loadData(backgroundImage, strokes) {
+        this.strokes = strokes || [];
+        this.undoStack = [];
+        this.redoStack = [];
+        
+        if (backgroundImage) {
+            const img = new Image();
+            img.onload = () => {
+                this.backgroundImage = img;
+                this.redrawAll();
+            };
+            img.src = backgroundImage;
+        } else {
+            this.backgroundImage = null;
+            this.redrawAll();
+        }
+    }
+
+    handlePointerDown(e) {
+        if (e.button !== 0) return;
+        this.drawCanvas.setPointerCapture(e.pointerId);
+        this.isDrawing = true;
+
+        const state = store.getState();
+        this.currentStroke = {
+            id: Date.now().toString(),
+            layer: state.activeLayer,
+            color: state.activeLayer === 'L3_Redline' ? '#FF4800' : '#1C1C1E',
+            baseWidth: state.activeLayer === 'L3_Redline' ? 3 : 1.5,
+            isEraser: state.activeTool === 'eraser',
+            points: [this.extractPoint(e)]
+        };
+    }
+
+    handlePointerMove(e) {
+        if (!this.isDrawing || !this.currentStroke) return;
+
+        // Extract high-frequency 120Hz ProMotion points from Apple Pencil
+        const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+        events.forEach(coalesced => {
+            this.currentStroke.points.push(this.extractPoint(coalesced));
+        });
+
+        this.redrawDrawCanvas();
+    }
+
+    handlePointerUp(e) {
+        if (!this.isDrawing) return;
+        this.isDrawing = false;
+        
+        if (this.currentStroke && this.currentStroke.points.length > 0) {
+            this.strokes.push(this.currentStroke);
+            this.undoStack.push({ type: 'ADD', stroke: this.currentStroke });
+            this.redoStack = []; // Clear redo chain
+            store.setState({ isDirty: true });
+        }
+        this.currentStroke = null;
+        this.redrawDrawCanvas();
+    }
+
+    extractPoint(e) {
+        const rect = this.drawCanvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+            pressure: e.pressure || 0.5
+        };
+    }
+
+    redrawAll() {
+        this.redrawBgCanvas();
+        this.redrawDrawCanvas();
+    }
+
+    redrawBgCanvas() {
+        this.bgCtx.clearRect(0, 0, this.bgCanvas.width, this.bgCanvas.height);
+        if (this.backgroundImage) {
+            // Aspect-ratio fit scale
+            const scale = Math.min(
+                this.bgCanvas.width / this.backgroundImage.width,
+                this.bgCanvas.height / this.backgroundImage.height
+            );
+            const w = this.backgroundImage.width * scale;
+            const h = this.backgroundImage.height * scale;
+            const x = (this.bgCanvas.width - w) / 2;
+            const y = (this.bgCanvas.height - h) / 2;
+
+            this.bgCtx.drawImage(this.backgroundImage, x, y, w, h);
+        }
+    }
+
+    redrawDrawCanvas() {
+        this.drawCtx.clearRect(0, 0, this.drawCanvas.width, this.drawCanvas.height);
+
+        const allStrokes = [...this.strokes];
+        if (this.currentStroke) allStrokes.push(this.currentStroke);
+
+        allStrokes.forEach(stroke => {
+            if (stroke.points.length < 2) return;
+
+            this.drawCtx.save();
+            if (stroke.isEraser) {
+                this.drawCtx.globalCompositeOperation = 'destination-out';
+                this.drawCtx.lineWidth = 20;
+            } else {
+                this.drawCtx.globalCompositeOperation = 'source-over';
+                this.drawCtx.strokeStyle = stroke.color;
+            }
+
+            this.drawCtx.lineCap = 'round';
+            this.drawCtx.lineJoin = 'round';
+
+            for (let i = 1; i < stroke.points.length; i++) {
+                const p1 = stroke.points[i - 1];
+                const p2 = stroke.points[i];
+                
+                this.drawCtx.beginPath();
+                this.drawCtx.moveTo(p1.x, p1.y);
+                this.drawCtx.lineTo(p2.x, p2.y);
+                
+                if (!stroke.isEraser) {
+                    this.drawCtx.lineWidth = stroke.baseWidth * (p2.pressure * 2);
+                }
+                this.drawCtx.stroke();
+            }
+            this.drawCtx.restore();
+        });
+    }
+
+    undo() {
+        if (this.strokes.length === 0) return;
+        const popped = this.strokes.pop();
+        this.redoStack.push(popped);
+        this.redrawDrawCanvas();
+        store.setState({ isDirty: true });
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return;
+        const restored = this.redoStack.pop();
+        this.strokes.push(restored);
+        this.redrawDrawCanvas();
+        store.setState({ isDirty: true });
+    }
+
+    clearInks() {
+        this.strokes = [];
+        this.undoStack = [];
+        this.redoStack = [];
+        this.redrawDrawCanvas();
+        store.setState({ isDirty: true });
+    }
+
+    setSubstrateImage(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            const img = new Image();
+            img.onload = () => {
+                this.backgroundImage = img;
+                this.redrawBgCanvas();
+                store.setState({ isDirty: true });
+            };
+            img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    purgeSubstrateImage() {
+        this.backgroundImage = null;
+        this.redrawBgCanvas();
+        store.setState({ isDirty: true });
+    }
+
+    getExportableData() {
+        return {
+            backgroundImage: this.backgroundImage ? this.backgroundImage.src : null,
+            strokes: this.strokes
+        };
+    }
 }
