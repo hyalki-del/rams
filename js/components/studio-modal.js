@@ -1,126 +1,106 @@
-import { saveCurrentDateState } from '../storage.js';
-import { CanvasInstance } from './canvas-engine.js';
+/**
+ * Studio Modal Controller: Coordinates Notes, Visual Engine, and Metadata Persistence
+ */
+import { store } from '../state.js';
+import { CanvasEngine } from './canvas-engine.js';
 
-export class StudioModal {
-  constructor() {
-    this.modal = document.getElementById('studioModal');
-    this.titleEl = document.getElementById('studioTopicTitle');
-    this.timeBadgeEl = document.getElementById('studioTimeBadge');
-    this.tabListEl = document.getElementById('tabList');
-    this.viewportEl = document.getElementById('studioCanvasViewport');
-    this.saveIndicator = document.getElementById('studioSaveIndicator');
+export class StudioModalController {
+    constructor(modalEl, onSaveTopic) {
+        this.modal = modalEl;
+        this.onSaveTopic = onSaveTopic;
+        this.activeTopic = null;
 
-    this.activeTopic = null;
-    this.activeCanvasIndex = 0;
-    this.currentCanvasEngine = null;
+        // UI Binding References
+        this.titleInput = document.getElementById('studioInputTitle');
+        this.tagsInput = document.getElementById('studioInputTags');
+        this.notesInput = document.getElementById('studioInputNotes');
+        this.badgeEl = document.getElementById('studioTopicBadge');
+        this.headerTitleEl = document.getElementById('studioTopicTitle');
 
-    this.bindEvents();
-  }
+        // Instantiate Layered Canvas Engine
+        const viewport = document.getElementById('canvasViewport');
+        const bgCanvas = document.getElementById('bgCanvas');
+        const drawCanvas = document.getElementById('drawCanvas');
+        this.engine = new CanvasEngine(viewport, bgCanvas, drawCanvas);
 
-  bindEvents() {
-    document.getElementById('closeStudioBtn').addEventListener('click', () => this.close());
-    document.getElementById('addTabBtn').addEventListener('click', () => this.addNewCanvasTab());
-    document.getElementById('undoBtn').addEventListener('click', () => this.undoActiveCanvas());
-    document.getElementById('clearCanvasBtn').addEventListener('click', () => this.clearActiveCanvas());
-    document.getElementById('removeCanvasBtn').addEventListener('click', () => this.removeActiveCanvasTab());
-  }
-
-  open(topic) {
-    this.activeTopic = topic;
-    this.activeCanvasIndex = 0;
-
-    this.titleEl.innerText = topic.title;
-    this.timeBadgeEl.innerText = `${formatTime(topic.startHour)} - ${formatTime(topic.startHour + topic.durationHours)}`;
-
-    if (!topic.canvases || topic.canvases.length === 0) {
-      topic.canvases = [{ id: crypto.randomUUID(), strokes: [] }];
+        this.bindEvents();
     }
 
-    this.modal.classList.remove('modal-hidden');
-    this.renderTabs();
-    this.mountActiveCanvas();
-  }
+    bindEvents() {
+        // Modal Teardown & Save
+        document.getElementById('btnCloseStudio').addEventListener('click', () => this.closeAndSave());
 
-  close() {
-    this.modal.classList.add('modal-hidden');
-    this.activeTopic = null;
-    this.currentCanvasEngine = null;
-    this.viewportEl.innerHTML = '';
-  }
+        // Inking Controls
+        document.getElementById('btnLayerPencil').addEventListener('click', (e) => this.switchLayer('L2_Pencil', e.target));
+        document.getElementById('btnLayerRedline').addEventListener('click', (e) => this.switchLayer('L3_Redline', e.target));
+        
+        document.getElementById('btnToolPencil').addEventListener('click', (e) => this.switchTool('pencil', e.target));
+        document.getElementById('btnToolEraser').addEventListener('click', (e) => this.switchTool('eraser', e.target));
 
-  renderTabs() {
-    this.tabListEl.innerHTML = '';
-    this.activeTopic.canvases.forEach((canvas, index) => {
-      const tabBtn = document.createElement('button');
-      tabBtn.className = `tab-btn ${index === this.activeCanvasIndex ? 'active' : ''}`;
-      tabBtn.innerText = `CANVAS 0${index + 1}`;
-      tabBtn.addEventListener('click', () => {
-        this.activeCanvasIndex = index;
-        this.renderTabs();
-        this.mountActiveCanvas();
-      });
-      this.tabListEl.appendChild(tabBtn);
-    });
-  }
+        document.getElementById('btnUndo').addEventListener('click', () => this.engine.undo());
+        document.getElementById('btnRedo').addEventListener('click', () => this.engine.redo());
+        document.getElementById('btnClearCanvas').addEventListener('click', () => {
+            if (confirm('Clear ink layer?')) this.engine.clearInks();
+        });
 
-  mountActiveCanvas() {
-    const canvasData = this.activeTopic.canvases[this.activeCanvasIndex];
-    if (!canvasData) return;
-
-    this.currentCanvasEngine = new CanvasInstance(
-      this.viewportEl,
-      canvasData,
-      () => this.notifySaved()
-    );
-  }
-
-  addNewCanvasTab() {
-    const newCanvas = { id: crypto.randomUUID(), strokes: [] };
-    this.activeTopic.canvases.push(newCanvas);
-    this.activeCanvasIndex = this.activeTopic.canvases.length - 1;
-    saveCurrentDateState();
-    this.renderTabs();
-    this.mountActiveCanvas();
-    this.notifySaved();
-  }
-
-  removeActiveCanvasTab() {
-    if (this.activeTopic.canvases.length <= 1) {
-      alert("A topic must retain at least one canvas tab.");
-      return;
+        // Photo Substrate
+        document.getElementById('imgLoader').addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                this.engine.setSubstrateImage(e.target.files[0]);
+            }
+        });
+        document.getElementById('btnPurgeImage').addEventListener('click', () => {
+            if (confirm('Remove photo overlay?')) this.engine.purgeSubstrateImage();
+        });
     }
 
-    if (confirm("Delete this canvas tab?")) {
-      this.activeTopic.canvases.splice(this.activeCanvasIndex, 1);
-      this.activeCanvasIndex = Math.max(0, this.activeCanvasIndex - 1);
-      saveCurrentDateState();
-      this.renderTabs();
-      this.mountActiveCanvas();
-      this.notifySaved();
+    open(topicRecord) {
+        this.activeTopic = topicRecord;
+        
+        // Populate inputs
+        this.titleInput.value = topicRecord.title || '';
+        this.tagsInput.value = (topicRecord.tags || []).join(', ');
+        this.notesInput.value = topicRecord.notes || '';
+        
+        this.headerTitleEl.innerText = (topicRecord.title || 'UNTITLED').toUpperCase();
+        this.badgeEl.innerText = topicRecord.tags && topicRecord.tags[0] ? `#${topicRecord.tags[0].toUpperCase()}` : '#LOG';
+
+        // Load Canvas Engine State
+        this.engine.loadData(topicRecord.backgroundImage, topicRecord.strokes);
+
+        this.modal.classList.remove('hidden');
     }
-  }
 
-  undoActiveCanvas() {
-    if (this.currentCanvasEngine) {
-      const undone = this.currentCanvasEngine.undo();
-      if (undone) this.notifySaved();
+    switchLayer(layerName, targetBtn) {
+        document.querySelectorAll('.btn-layer').forEach(b => b.classList.remove('active'));
+        targetBtn.classList.add('active');
+        store.setState({ activeLayer: layerName });
     }
-  }
 
-  clearActiveCanvas() {
-    if (this.currentCanvasEngine && confirm("Clear all strokes on this canvas?")) {
-      this.currentCanvasEngine.clear();
-      this.notifySaved();
+    switchTool(toolName, targetBtn) {
+        document.querySelectorAll('.btn-ram-tool').forEach(b => b.classList.remove('active'));
+        targetBtn.classList.add('active');
+        store.setState({ activeTool: toolName });
     }
-  }
 
-  notifySaved() {
-    this.saveIndicator.innerText = `STATUS: AUTO_SAVED (${new Date().toLocaleTimeString()})`;
-  }
-}
+    closeAndSave() {
+        const canvasData = this.engine.getExportableData();
+        
+        const tagsArray = this.tagsInput.value
+            .split(',')
+            .map(t => t.trim().toUpperCase())
+            .filter(Boolean);
 
-function formatTime(decimalHours) {
-  const hrs = Math.floor(decimalHours);
-  const mins = Math.round((decimalHours - hrs) * 60);
-  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+        const updatedTopic = {
+            ...this.activeTopic,
+            title: this.titleInput.value.trim() || 'UNTITLED TOPIC',
+            tags: tagsArray,
+            notes: this.notesInput.value,
+            backgroundImage: canvasData.backgroundImage,
+            strokes: canvasData.strokes
+        };
+
+        this.modal.classList.add('hidden');
+        this.onSaveTopic(updatedTopic);
+    }
 }
