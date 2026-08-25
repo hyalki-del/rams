@@ -1,55 +1,271 @@
-/**
- * Time-Grid Schedule & Topic Card Interaction Engine
- */
-import { store } from '../state.js';
-import { storage } from '../storage.js';
+import { AppState } from '../state.js';
+
+export const TIME_SLOTS = ["07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"];
 
 export class AgendaController {
-    constructor(containerEl, onOpenTopicStudio) {
-        this.container = containerEl;
-        this.onOpenTopicStudio = onOpenTopicStudio;
+    constructor(saveCallback, openStudioCallback) {
+        this.saveCallback = saveCallback;
+        this.openStudioCallback = openStudioCallback;
+        this.agendaGrid = document.getElementById('agendaGrid');
+        this.topicCreateModal = document.getElementById('topicCreateModal');
+        this.topicContextModal = document.getElementById('topicContextModal');
+        this.selectTopicTime = document.getElementById('selectTopicTime');
+        this.inputTopicTitle = document.getElementById('inputTopicTitle');
+        
+        this.pendingTimeSlot = null;
+        this.draggedTopicId = null;
+        this.draggedFromSlot = null;
+
+        this.initModalOptions();
+        this.bindGlobalGestures();
     }
 
-    render(entryRecord) {
-        this.container.innerHTML = '';
+    initModalOptions() {
+        this.selectTopicTime.innerHTML = '';
+        TIME_SLOTS.forEach(slot => {
+            const h = parseInt(slot.split(':')[0]);
+            const opt1 = document.createElement('option');
+            opt1.value = `${slot}`;
+            opt1.textContent = `${slot}`;
+            
+            const opt2 = document.createElement('option');
+            const halfTime = `${h < 10 ? '0' + h : h}:30`;
+            opt2.value = halfTime;
+            opt2.textContent = halfTime;
 
-        if (!entryRecord.topics || entryRecord.topics.length === 0) {
-            this.container.innerHTML = `
-                <div class="border border-dashed border-divider p-8 text-center">
-                    <p class="font-mono text-xs text-graphite-light">NO TOPIC CARDS RECORDED FOR THIS DATE.</p>
-                    <p class="font-mono text-[10px] text-graphite-light mt-1">CLICK "+ NEW TOPIC CARD" TO START DETAILING.</p>
-                </div>
-            `;
-            return;
+            this.selectTopicTime.appendChild(opt1);
+            this.selectTopicTime.appendChild(opt2);
+        });
+
+        document.getElementById('btnCancelCreateTopic').onclick = () => this.topicCreateModal.close();
+        document.getElementById('formCreateTopic').onsubmit = (e) => {
+            e.preventDefault();
+            this.handleConfirmTopicCreate();
+        };
+    }
+
+    renderGrid() {
+        this.agendaGrid.innerHTML = '';
+
+        TIME_SLOTS.forEach(time => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-4 border-b border-[#1C1C1E]/20 pb-3 pt-2';
+
+            const timeLabel = document.createElement('span');
+            timeLabel.className = 'text-xs font-extrabold w-12 text-right shrink-0 select-none';
+            timeLabel.innerText = time;
+
+            const slotContainer = document.createElement('div');
+            slotContainer.className = 'flex-1 flex items-center gap-3 min-h-[48px] p-1 border border-transparent rounded transition';
+            slotContainer.dataset.timeSlot = time;
+
+            const topics = AppState.agenda[time] || [];
+            topics.forEach(topic => {
+                const card = document.createElement('div');
+                card.className = 'topic-box px-4 py-2 font-extrabold text-xs cursor-pointer flex-1 text-center select-none';
+                card.innerText = topic.title;
+                card.dataset.topicId = topic.id;
+                card.dataset.timeSlot = time;
+                slotContainer.appendChild(card);
+            });
+
+            // Far-right empty drop/touch expansion region
+            const emptyZone = document.createElement('div');
+            emptyZone.className = 'w-10 h-full min-h-[40px] border border-dashed border-[#1C1C1E]/20 hover:border-[#FF4800] flex items-center justify-center cursor-pointer';
+            emptyZone.title = 'Hold 1000ms to append topic';
+            emptyZone.innerText = '+';
+            emptyZone.dataset.emptyZone = "true";
+            emptyZone.dataset.timeSlot = time;
+            slotContainer.appendChild(emptyZone);
+
+            row.appendChild(timeLabel);
+            row.appendChild(slotContainer);
+            this.agendaGrid.appendChild(row);
+        });
+    }
+
+    bindGlobalGestures() {
+        let timer500 = null;
+        let timer1000 = null;
+        let gestureFired = false;
+        let startX = 0, startY = 0;
+        let activeCard = null;
+
+        // Pointerdown gesture state machine
+        this.agendaGrid.addEventListener('pointerdown', (e) => {
+            gestureFired = false;
+            startX = e.clientX;
+            startY = e.clientY;
+
+            const card = e.target.closest('.topic-box');
+            const slot = e.target.closest('[data-time-slot]');
+
+            if (card) {
+                activeCard = card;
+                const topicId = card.dataset.topicId;
+                const slotTime = card.dataset.timeSlot;
+
+                // 500ms Hold -> Context Options Menu
+                timer500 = setTimeout(() => {
+                    gestureFired = true;
+                    this.openContextMenu(slotTime, topicId);
+                }, 500);
+
+                // 1000ms Hold & Drag Initialization
+                timer1000 = setTimeout(() => {
+                    gestureFired = true;
+                    clearTimeout(timer500);
+                    this.initDragAndDrop(card, slotTime, topicId, e);
+                }, 1000);
+
+            } else if (slot) {
+                const slotTime = slot.dataset.timeSlot;
+
+                // 1000ms Hold on Empty Slot -> Open Topic Creation & 30-min Time Modal
+                timer1000 = setTimeout(() => {
+                    gestureFired = true;
+                    this.openCreateModal(slotTime);
+                }, 1000);
+            }
+        });
+
+        this.agendaGrid.addEventListener('pointermove', (e) => {
+            const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+            if (dist > 8) {
+                clearTimeout(timer500);
+                clearTimeout(timer1000);
+            }
+        });
+
+        const cancelTimers = () => {
+            clearTimeout(timer500);
+            clearTimeout(timer1000);
+        };
+
+        this.agendaGrid.addEventListener('pointerup', cancelTimers);
+        this.agendaGrid.addEventListener('pointercancel', cancelTimers);
+
+        // Double Click -> Open Drafting Studio Workspace
+        this.agendaGrid.addEventListener('dblclick', (e) => {
+            const card = e.target.closest('.topic-box');
+            if (card) {
+                const slotTime = card.dataset.timeSlot;
+                const topicId = card.dataset.topicId;
+                const topic = AppState.agenda[slotTime].find(t => t.id === topicId);
+                if (topic) {
+                    this.openStudioCallback(slotTime, topic);
+                }
+            }
+        });
+    }
+
+    openCreateModal(slotTime) {
+        this.pendingTimeSlot = slotTime;
+        this.inputTopicTitle.value = '';
+        this.selectTopicTime.value = slotTime;
+        this.topicCreateModal.showModal();
+    }
+
+    handleConfirmTopicCreate() {
+        const title = this.inputTopicTitle.value.trim().toUpperCase();
+        const selectedTime = this.selectTopicTime.value;
+        if (!title) return;
+
+        // Standardize time mapping (e.g., 08:30 maps into 08:00 parent slot row)
+        const baseHourSlot = `${selectedTime.split(':')[0]}:00`;
+
+        if (!AppState.agenda[baseHourSlot]) {
+            AppState.agenda[baseHourSlot] = [];
         }
 
-        entryRecord.topics.forEach(topic => {
-            const card = document.createElement('div');
-            card.className = "border border-graphite p-4 bg-paper hover:border-signal-orange cursor-pointer transition-all flex justify-between items-start group shadow-ram";
-            
-            const tagPills = (topic.tags || []).map(t => `<span class="bg-divider text-graphite text-[9px] font-mono px-1.5 py-0.5 uppercase font-bold mr-1">${t}</span>`).join('');
-            const hasDrawings = topic.strokes && topic.strokes.length > 0;
-            const hasPhoto = !!topic.backgroundImage;
+        const newTopic = {
+            id: 'topic_' + Date.now(),
+            title: `${selectedTime} - ${title}`,
+            strokes: [],
+            bgImage: null
+        };
 
-            card.innerHTML = `
-                <div class="space-y-2 flex-1 pr-4">
-                    <div class="flex items-center space-x-2">
-                        <span class="font-mono text-xs font-black uppercase text-graphite group-hover:text-signal-orange">${topic.title || 'UNTITLED TOPIC'}</span>
-                        <div class="flex items-center">${tagPills}</div>
-                    </div>
-                    <p class="font-mono text-xs text-graphite-light line-clamp-2">${topic.notes || 'No notes added...'}</p>
-                    
-                    <div class="flex items-center space-x-3 pt-2 text-[10px] font-mono text-graphite-light">
-                        <span>INK STROKES: <strong>${topic.strokes ? topic.strokes.length : 0}</strong></span>
-                        <span>PHOTO OVERLAY: <strong>${hasPhoto ? 'YES' : 'NO'}</strong></span>
-                    </div>
-                </div>
+        AppState.agenda[baseHourSlot].push(newTopic);
+        this.topicCreateModal.close();
+        this.saveCallback();
+        this.renderGrid();
+    }
 
-                <button class="btn-ram text-xs self-center shrink-0">ENTER STUDIO ➔</button>
-            `;
+    openContextMenu(slotTime, topicId) {
+        const topic = AppState.agenda[slotTime].find(t => t.id === topicId);
+        if (!topic) return;
 
-            card.addEventListener('click', () => this.onOpenTopicStudio(topic.id));
-            this.container.appendChild(card);
-        });
+        this.topicContextModal.showModal();
+
+        document.getElementById('ctxEdit').onclick = () => {
+            this.topicContextModal.close();
+            const newTitle = prompt('EDIT TOPIC TITLE:', topic.title);
+            if (newTitle && newTitle.trim()) {
+                topic.title = newTitle.trim().toUpperCase();
+                this.saveCallback();
+                this.renderGrid();
+            }
+        };
+
+        document.getElementById('ctxDelete').onclick = () => {
+            this.topicContextModal.close();
+            if (confirm(`DELETE TOPIC "${topic.title}"?`)) {
+                AppState.agenda[slotTime] = AppState.agenda[slotTime].filter(t => t.id !== topicId);
+                this.saveCallback();
+                this.renderGrid();
+            }
+        };
+
+        document.getElementById('ctxCancel').onclick = () => this.topicContextModal.close();
+    }
+
+    initDragAndDrop(card, fromSlot, topicId, initialEvent) {
+        this.draggedTopicId = topicId;
+        this.draggedFromSlot = fromSlot;
+
+        card.classList.add('is-dragging');
+        card.setPointerCapture(initialEvent.pointerId);
+
+        let currentDropTarget = null;
+
+        const onPointerMove = (e) => {
+            const elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+            const slotContainer = elemBelow ? elemBelow.closest('[data-time-slot]') : null;
+
+            document.querySelectorAll('[data-time-slot]').forEach(s => s.classList.remove('slot-drop-target'));
+
+            if (slotContainer) {
+                currentDropTarget = slotContainer.dataset.timeSlot;
+                slotContainer.classList.add('slot-drop-target');
+            } else {
+                currentDropTarget = null;
+            }
+        };
+
+        const onPointerUp = (e) => {
+            card.releasePointerCapture(e.pointerId);
+            card.classList.remove('is-dragging');
+            document.querySelectorAll('[data-time-slot]').forEach(s => s.classList.remove('slot-drop-target'));
+
+            card.removeEventListener('pointermove', onPointerMove);
+            card.removeEventListener('pointerup', onPointerUp);
+
+            if (currentDropTarget && currentDropTarget !== fromSlot) {
+                // Perform state migration across time slots
+                const topicIndex = AppState.agenda[fromSlot].findIndex(t => t.id === topicId);
+                if (topicIndex !== -1) {
+                    const [movedTopic] = AppState.agenda[fromSlot].splice(topicIndex, 1);
+                    if (!AppState.agenda[currentDropTarget]) {
+                        AppState.agenda[currentDropTarget] = [];
+                    }
+                    AppState.agenda[currentDropTarget].push(movedTopic);
+                    this.saveCallback();
+                    this.renderGrid();
+                }
+            }
+        };
+
+        card.addEventListener('pointermove', onPointerMove);
+        card.addEventListener('pointerup', onPointerUp);
     }
 }
