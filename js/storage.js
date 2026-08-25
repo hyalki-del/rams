@@ -1,96 +1,60 @@
 /**
- * Offline-First IndexedDB Engine with Vector Serialization
+ * LOCAL-FIRST INDEXEDDB ENGINE & JSON EXPORTER
  */
-const DB_NAME = 'ArchLogbookDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'agenda_entries';
-
-class StorageEngine {
+export class StorageEngine {
     constructor() {
+        this.dbName = 'RamsArchLogbook';
+        this.dbVersion = 1;
         this.db = null;
     }
 
     async init() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            
+            const request = indexedDB.open(this.dbName, this.dbVersion);
             request.onupgradeneeded = (e) => {
                 const db = e.target.result;
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME, { keyPath: 'date' });
+                if (!db.objectStoreNames.contains('entries')) {
+                    db.createObjectStore('entries', { keyPath: 'dateKey' });
                 }
             };
-
             request.onsuccess = (e) => {
                 this.db = e.target.result;
-                resolve(this.db);
+                resolve();
             };
-
             request.onerror = (e) => reject(e.target.error);
         });
     }
 
     async getEntry(dateKey) {
-        return new Promise((resolve, reject) => {
-            const tx = this.db.transaction(STORE_NAME, 'readonly');
-            const store = tx.objectStore(STORE_NAME);
-            const request = store.get(dateKey);
-
-            request.onsuccess = () => {
-                if (request.result) {
-                    resolve(request.result);
-                } else {
-                    // Return fresh day schema
-                    resolve({
-                        date: dateKey,
-                        topics: []
-                    });
-                }
-            };
-            request.onerror = () => reject(request.error);
+        return new Promise((resolve) => {
+            if (!this.db) return resolve(null);
+            const tx = this.db.transaction('entries', 'readonly');
+            const store = tx.objectStore('entries');
+            const req = store.get(dateKey);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
         });
     }
 
     async saveEntry(entryData) {
         return new Promise((resolve, reject) => {
-            const tx = this.db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            const request = store.put(entryData);
-
-            request.onsuccess = () => resolve(true);
-            request.onerror = () => reject(request.error);
+            if (!this.db) return reject('Database Not Initialized');
+            const tx = this.db.transaction('entries', 'readwrite');
+            const store = tx.objectStore('entries');
+            const req = store.put(entryData);
+            req.onsuccess = () => resolve();
+            req.onerror = (e) => reject(e.target.error);
         });
     }
 
-    async exportJSON() {
-        const tx = this.db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const request = store.getAll();
-
+    async getAllEntries() {
         return new Promise((resolve) => {
-            request.onsuccess = () => {
-                const blob = new Blob([JSON.stringify(request.result, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `ARCH_LOGBOOK_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                resolve();
-            };
+            if (!this.db) return resolve([]);
+            const tx = this.db.transaction('entries', 'readonly');
+            const store = tx.objectStore('entries');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
         });
-    }
-
-    async importJSON(file) {
-        const text = await file.text();
-        const entries = JSON.parse(text);
-        const tx = this.db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-
-        for (const entry of entries) {
-            await store.put(entry);
-        }
     }
 }
-
-export const storage = new StorageEngine();
