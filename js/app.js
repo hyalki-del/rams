@@ -1,133 +1,134 @@
-/**
- * Master Application Bootstrapper & Controller Orchestrator
- */
-import { store } from './state.js';
-import { storage } from './storage.js';
+import { AppState } from './state.js';
+import { StorageEngine } from './storage.js';
 import { AgendaController } from './components/agenda.js';
-import { StudioModalController } from './components/studio-modal.js';
+import { CanvasEngine } from './components/canvas-engine.js';
 
-class AppController {
+class ApplicationController {
     constructor() {
-        this.agendaView = null;
-        this.studioModal = null;
+        this.storage = new StorageEngine();
+        this.agenda = null;
+        this.canvas = null;
     }
 
     async init() {
-        await storage.init();
-
-        // UI Bindings
-        this.datePicker = document.getElementById('datePicker');
-        this.displayDateHeading = document.getElementById('displayDateHeading');
+        await this.storage.init();
         
-        const topicContainer = document.getElementById('topicContainer');
-        const modalEl = document.getElementById('studioModal');
+        // Instantiate component controllers
+        this.canvas = new CanvasEngine(() => this.saveCurrentState());
+        this.agenda = new AgendaController(
+            () => this.saveCurrentState(),
+            (slotTime, topic) => this.canvas.openStudio(slotTime, topic)
+        );
 
-        // Instantiate Components
-        this.agendaView = new AgendaController(topicContainer, this.openStudioForTopic.bind(this));
-        this.studioModal = new StudioModalController(modalEl, this.saveTopicState.bind(this));
-
-        this.bindEvents();
+        this.bindDateNavigation();
+        this.bindBackupControls();
         
-        // Initial State Boot
-        const initialDate = store.getState().currentDate;
-        this.datePicker.value = initialDate;
-        await this.loadDay(initialDate);
-
-        store.subscribe(this.handleStateChange.bind(this));
+        await this.loadDateState(AppState.currentDate);
     }
 
-    bindEvents() {
-        // Date Shuffler Navigation
-        this.datePicker.addEventListener('change', (e) => this.loadDay(e.target.value));
-        
-        document.getElementById('btnPrevDate').addEventListener('click', () => {
-            const current = new Date(store.getState().currentDate);
-            current.setDate(current.getDate() - 1);
-            const prevStr = current.toISOString().split('T')[0];
-            this.datePicker.value = prevStr;
-            this.loadDay(prevStr);
-        });
+    bindDateNavigation() {
+        const dateInput = document.getElementById('dateInput');
+        const dateDisplay = document.getElementById('dateDisplay');
+        const btnPrevDay = document.getElementById('btnPrevDay');
+        const btnNextDay = document.getElementById('btnNextDay');
+        const btnToday = document.getElementById('btnToday');
 
-        document.getElementById('btnNextDate').addEventListener('click', () => {
-            const current = new Date(store.getState().currentDate);
-            current.setDate(current.getDate() + 1);
-            const nextStr = current.toISOString().split('T')[0];
-            this.datePicker.value = nextStr;
-            this.loadDay(nextStr);
-        });
+        dateInput.value = AppState.currentDate;
+        this.updateDateTitle(AppState.currentDate);
 
-        // Topic Creation
-        document.getElementById('btnNewTopic').addEventListener('click', () => this.createTopic());
-
-        // Backup Export / Import
-        document.getElementById('btnExportJSON').addEventListener('click', () => storage.exportJSON());
-        
-        const fileImport = document.getElementById('fileImport');
-        document.getElementById('btnImportJSON').addEventListener('click', () => fileImport.click());
-        fileImport.addEventListener('change', async (e) => {
-            if (e.target.files && e.target.files[0]) {
-                await storage.importJSON(e.target.files[0]);
-                await this.loadDay(store.getState().currentDate);
-                alert('ARCHIVE IMPORTED SUCCESSFULLY.');
+        dateInput.addEventListener('change', async (e) => {
+            if (e.target.value) {
+                AppState.currentDate = e.target.value;
+                this.updateDateTitle(AppState.currentDate);
+                await this.loadDateState(AppState.currentDate);
             }
         });
+
+        btnPrevDay.onclick = () => this.shiftDate(-1);
+        btnNextDay.onclick = () => this.shiftDate(1);
+        btnToday.onclick = () => {
+            AppState.currentDate = new Date().toISOString().split('T')[0];
+            dateInput.value = AppState.currentDate;
+            this.updateDateTitle(AppState.currentDate);
+            this.loadDateState(AppState.currentDate);
+        };
     }
 
-    async loadDay(dateKey) {
-        const record = await storage.getEntry(dateKey);
-        this.displayDateHeading.innerText = dateKey.replace(/-/g, '.');
-        store.setState({ currentDate: dateKey, activeEntry: record });
-        this.agendaView.render(record);
+    shiftDate(days) {
+        const d = new Date(AppState.currentDate);
+        d.setDate(d.getDate() + days);
+        AppState.currentDate = d.toISOString().split('T')[0];
+        document.getElementById('dateInput').value = AppState.currentDate;
+        this.updateDateTitle(AppState.currentDate);
+        this.loadDateState(AppState.currentDate);
     }
 
-    async createTopic() {
-        const state = store.getState();
-        const activeEntry = state.activeEntry;
+    updateDateTitle(isoString) {
+        const parts = isoString.split('-');
+        document.getElementById('dateDisplay').innerText = `${parts[0]}.${parts[1]}.${parts[2]}`;
+    }
 
-        const newTopic = {
-            id: Date.now().toString(),
-            title: 'NEW FIELD SKETCH',
-            tags: ['SITE'],
-            notes: '',
-            backgroundImage: null,
-            strokes: []
+    async loadDateState(dateKey) {
+        const record = await this.storage.getEntry(dateKey);
+        AppState.agenda = (record && record.agenda) ? record.agenda : {};
+        this.agenda.renderGrid();
+    }
+
+    async saveCurrentState() {
+        const syncStatus = document.getElementById('syncStatus');
+        syncStatus.innerText = 'STATUS: SAVING...';
+
+        const record = {
+            dateKey: AppState.currentDate,
+            agenda: AppState.agenda,
+            updatedAt: new Date().toISOString()
         };
 
-        activeEntry.topics.push(newTopic);
-        await storage.saveEntry(activeEntry);
-        this.agendaView.render(activeEntry);
-        
-        // Auto-open studio for quick entry
-        this.openStudioForTopic(newTopic.id);
+        await this.storage.saveEntry(record);
+        syncStatus.innerText = 'STATUS: IDLE';
     }
 
-    openStudioForTopic(topicId) {
-        const state = store.getState();
-        const topic = state.activeEntry.topics.find(t => t.id === topicId);
-        if (topic) {
-            store.setState({ activeTopicId: topicId });
-            this.studioModal.open(topic);
-        }
-    }
+    bindBackupControls() {
+        document.getElementById('btnExportJSON').onclick = async () => {
+            const allEntries = await this.storage.getAllEntries();
+            const blob = new Blob([JSON.stringify(allEntries, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `RAMS_LOGBOOK_BACKUP_${AppState.currentDate}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
 
-    async saveTopicState(updatedTopic) {
-        const state = store.getState();
-        const activeEntry = state.activeEntry;
+        const fileImport = document.getElementById('fileImport');
+        document.getElementById('btnImportJSON').onclick = () => fileImport.click();
 
-        const index = activeEntry.topics.findIndex(t => t.id === updatedTopic.id);
-        if (index !== -1) {
-            activeEntry.topics[index] = updatedTopic;
-            await storage.saveEntry(activeEntry);
-            this.agendaView.render(activeEntry);
-        }
-    }
+        fileImport.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-    handleStateChange(state) {
-        // Handle cross-cutting concerns if needed
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                try {
+                    const entries = JSON.parse(evt.target.result);
+                    if (Array.isArray(entries)) {
+                        for (const entry of entries) {
+                            await this.storage.saveEntry(entry);
+                        }
+                        alert('RESTORE SUCCESSFUL.');
+                        await this.loadDateState(AppState.currentDate);
+                    }
+                } catch (err) {
+                    alert('INVALID BACKUP FILE.');
+                }
+            };
+            reader.readAsText(file);
+        };
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const app = new AppController();
+// Global Application Instantiation
+window.addEventListener('DOMContentLoaded', () => {
+    const app = new ApplicationController();
     app.init();
 });
