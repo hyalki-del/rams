@@ -1,48 +1,133 @@
-import { AppState } from './state.js';
-import { initDB, loadDateState, syncToGoogleCloud } from './storage.js';
-import { renderAgendaView, createNewTopic } from './components/agenda.js';
+/**
+ * Master Application Bootstrapper & Controller Orchestrator
+ */
+import { store } from './state.js';
+import { storage } from './storage.js';
+import { AgendaController } from './components/agenda.js';
+import { StudioModalController } from './components/studio-modal.js';
 
-async function loadConfig() {
-  try {
-    const res = await fetch('./config.json', { cache: 'no-store' });
-    AppState.config = await res.json();
-    document.getElementById('configStatus').innerText = `CONFIG: LOADED (${AppState.config.environment.toUpperCase()})`;
-  } catch (err) {
-    document.getElementById('configStatus').innerText = "CONFIG: LOAD_FAILED";
-  }
+class AppController {
+    constructor() {
+        this.agendaView = null;
+        this.studioModal = null;
+    }
+
+    async init() {
+        await storage.init();
+
+        // UI Bindings
+        this.datePicker = document.getElementById('datePicker');
+        this.displayDateHeading = document.getElementById('displayDateHeading');
+        
+        const topicContainer = document.getElementById('topicContainer');
+        const modalEl = document.getElementById('studioModal');
+
+        // Instantiate Components
+        this.agendaView = new AgendaController(topicContainer, this.openStudioForTopic.bind(this));
+        this.studioModal = new StudioModalController(modalEl, this.saveTopicState.bind(this));
+
+        this.bindEvents();
+        
+        // Initial State Boot
+        const initialDate = store.getState().currentDate;
+        this.datePicker.value = initialDate;
+        await this.loadDay(initialDate);
+
+        store.subscribe(this.handleStateChange.bind(this));
+    }
+
+    bindEvents() {
+        // Date Shuffler Navigation
+        this.datePicker.addEventListener('change', (e) => this.loadDay(e.target.value));
+        
+        document.getElementById('btnPrevDate').addEventListener('click', () => {
+            const current = new Date(store.getState().currentDate);
+            current.setDate(current.getDate() - 1);
+            const prevStr = current.toISOString().split('T')[0];
+            this.datePicker.value = prevStr;
+            this.loadDay(prevStr);
+        });
+
+        document.getElementById('btnNextDate').addEventListener('click', () => {
+            const current = new Date(store.getState().currentDate);
+            current.setDate(current.getDate() + 1);
+            const nextStr = current.toISOString().split('T')[0];
+            this.datePicker.value = nextStr;
+            this.loadDay(nextStr);
+        });
+
+        // Topic Creation
+        document.getElementById('btnNewTopic').addEventListener('click', () => this.createTopic());
+
+        // Backup Export / Import
+        document.getElementById('btnExportJSON').addEventListener('click', () => storage.exportJSON());
+        
+        const fileImport = document.getElementById('fileImport');
+        document.getElementById('btnImportJSON').addEventListener('click', () => fileImport.click());
+        fileImport.addEventListener('change', async (e) => {
+            if (e.target.files && e.target.files[0]) {
+                await storage.importJSON(e.target.files[0]);
+                await this.loadDay(store.getState().currentDate);
+                alert('ARCHIVE IMPORTED SUCCESSFULLY.');
+            }
+        });
+    }
+
+    async loadDay(dateKey) {
+        const record = await storage.getEntry(dateKey);
+        this.displayDateHeading.innerText = dateKey.replace(/-/g, '.');
+        store.setState({ currentDate: dateKey, activeEntry: record });
+        this.agendaView.render(record);
+    }
+
+    async createTopic() {
+        const state = store.getState();
+        const activeEntry = state.activeEntry;
+
+        const newTopic = {
+            id: Date.now().toString(),
+            title: 'NEW FIELD SKETCH',
+            tags: ['SITE'],
+            notes: '',
+            backgroundImage: null,
+            strokes: []
+        };
+
+        activeEntry.topics.push(newTopic);
+        await storage.saveEntry(activeEntry);
+        this.agendaView.render(activeEntry);
+        
+        // Auto-open studio for quick entry
+        this.openStudioForTopic(newTopic.id);
+    }
+
+    openStudioForTopic(topicId) {
+        const state = store.getState();
+        const topic = state.activeEntry.topics.find(t => t.id === topicId);
+        if (topic) {
+            store.setState({ activeTopicId: topicId });
+            this.studioModal.open(topic);
+        }
+    }
+
+    async saveTopicState(updatedTopic) {
+        const state = store.getState();
+        const activeEntry = state.activeEntry;
+
+        const index = activeEntry.topics.findIndex(t => t.id === updatedTopic.id);
+        if (index !== -1) {
+            activeEntry.topics[index] = updatedTopic;
+            await storage.saveEntry(activeEntry);
+            this.agendaView.render(activeEntry);
+        }
+    }
+
+    handleStateChange(state) {
+        // Handle cross-cutting concerns if needed
+    }
 }
 
-function bindGlobalControls() {
-  document.getElementById('addTopicBtn').addEventListener('click', () => createNewTopic());
-  document.getElementById('cloudSyncBtn').addEventListener('click', () => syncToGoogleCloud());
-
-  document.getElementById('prevDateBtn').addEventListener('click', () => changeDate(-1));
-  document.getElementById('nextDateBtn').addEventListener('click', () => changeDate(1));
-
-  document.getElementById('exportBtn').addEventListener('click', () => {
-    const data = JSON.stringify(AppState.agenda[AppState.currentDate] || [], null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `ARCH_AGENDA_${AppState.currentDate}.json`;
-    a.click();
-  });
-}
-
-async function changeDate(deltaDays) {
-  const date = new Date(AppState.currentDate);
-  date.setDate(date.getDate() + deltaDays);
-  AppState.currentDate = date.toISOString().split('T')[0];
-  
-  document.getElementById('currentDateDisplay').innerText = AppState.currentDate.replace(/-/g, '.');
-  await loadDateState(AppState.currentDate);
-  renderAgendaView();
-}
-
-(async function boot() {
-  await loadConfig();
-  await initDB();
-  bindGlobalControls();
-  await loadDateState(AppState.currentDate);
-  renderAgendaView();
-})();
+document.addEventListener('DOMContentLoaded', () => {
+    const app = new AppController();
+    app.init();
+});
